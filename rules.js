@@ -138,11 +138,9 @@
       player.collection.addCards(cards);
       this._log(`${player.name} spielt ${cards.length} Karte(n) im Set "${setName}" aus.`);
 
-      for (const card of cards) {
-        if (card.type === 'mysterio' && typeof card.drawback === 'function') {
-          card.drawback({ game: this, player });
-        }
-      }
+      // Mysterio-Karten haben schon einen (Platzhalter-)Effekttext in der UI,
+      // ihre specialEffect/drawback-Funktionen werden für V0.1 aber bewusst
+      // noch nicht ausgelöst - das Verdrahten folgt in einer späteren Version.
 
       if (this.phase === 'playing') {
         if (this.drawPile.isEmpty) {
@@ -241,25 +239,19 @@
     }
 
     // --- Wertung -----------------------------------------------------------
+    // Mysterio-Karten zählen hier wie normale Objektkarten über ihr Set
+    // "Mysterio" mit - ihr specialEffect-Bonus ist für V0.1 bewusst noch
+    // nicht verdrahtet (siehe MysterioCard-Kommentar in cards.js).
     calculateScores() {
       return this.players.map((player) => {
         const { total, breakdown } = player.collection.computeScore();
-        let mysterioBonus = 0;
-        for (const cards of player.collection.getGroups().values()) {
-          for (const card of cards) {
-            if (card.type === 'mysterio' && typeof card.specialEffect === 'function') {
-              mysterioBonus += card.specialEffect({ game: this, player }) || 0;
-            }
-          }
-        }
         const handPoints = player.hand.reduce((sum, c) => sum + (c.points || 0), 0);
         return {
           player,
           setPoints: total,
           breakdown,
-          mysterioBonus,
           handPoints,
-          total: total + mysterioBonus + handPoints,
+          total: total + handPoints,
         };
       });
     }

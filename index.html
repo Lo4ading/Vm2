@@ -88,9 +88,12 @@
       </div>
 
       <div class="trade-form" id="trade-form" hidden>
-        <input type="text" id="trade-input" placeholder="Tauschangebot (optional, wird nur protokolliert)">
-        <button id="trade-submit-btn" class="primary">Ankündigen</button>
-        <button id="trade-cancel-btn">Abbrechen</button>
+        <p class="trade-form-title">🤝 Tauschbörse <span>– wird nur protokolliert, ohne Automatik</span></p>
+        <div class="trade-form-row">
+          <input type="text" id="trade-input" maxlength="80" placeholder="z. B. „2 Bücher gegen 1 Deko-Fund“">
+          <button id="trade-submit-btn" class="primary">Ankündigen</button>
+          <button id="trade-cancel-btn">Abbrechen</button>
+        </div>
       </div>
 
       <div class="discard-required" id="discard-required" hidden>

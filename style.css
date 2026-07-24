@@ -402,8 +402,8 @@ input:focus-visible,
 .card {
   --card-accent: var(--border-strong);
   position: relative;
-  width: 96px;
-  height: 128px;
+  width: 112px;
+  height: 152px;
   border: 2px solid var(--card-accent);
   border-radius: 10px;
   background:
@@ -414,7 +414,7 @@ input:focus-visible,
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 10px 6px 8px;
+  padding: 10px 8px 8px;
   font-size: 0.75rem;
   text-align: center;
   cursor: pointer;
@@ -428,11 +428,23 @@ input:focus-visible,
 }
 
 .card .placeholder {
-  font-size: 2rem;
+  font-size: 1.8rem;
   line-height: 1;
 }
 
 .card .card-name {
+  font-weight: 600;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-effect-hint {
+  font-size: 0.62rem;
+  color: var(--warning);
   font-weight: 600;
 }
 
@@ -594,15 +606,46 @@ input:focus-visible,
 }
 
 .trade-form:not([hidden]) {
+  display: block;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  animation: trade-form-in 0.2s ease;
+}
+
+.trade-form-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.trade-form-title span {
+  font-weight: normal;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.trade-form-row {
   display: flex;
   gap: 6px;
-  margin-top: 8px;
   flex-wrap: wrap;
 }
 
 .trade-form input {
   flex: 1;
   min-width: 200px;
+}
+
+@keyframes trade-form-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trade-form:not([hidden]) {
+    animation: none;
+  }
 }
 
 #toast-container {
@@ -634,6 +677,11 @@ input:focus-visible,
 .toast.event {
   background: var(--event-bg);
   color: var(--text);
+}
+
+.toast.trade {
+  background: var(--accent);
+  color: #fff;
 }
 
 @keyframes toast-in {

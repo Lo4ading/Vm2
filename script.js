@@ -18,6 +18,14 @@
 
   const CONFETTI_EMOJI = ['🎉', '🎊', '✨', '🥳'];
 
+  // Spielernamen und Tauschangebote kommen von Nutzereingaben und landen an
+  // mehreren Stellen in innerHTML-Strings - ungeschützt wäre das eine
+  // HTML-Injection (z. B. brach ein "<" im Tauschtext bisher das Log-Rendering).
+  const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+  }
+
   // --- DOM-Referenzen -----------------------------------------------------
   const el = {
     setupScreen: document.getElementById('setup-screen'),
@@ -76,6 +84,7 @@
       const input = document.createElement('input');
       input.type = 'text';
       input.placeholder = `Name Spieler ${i + 1} (optional)`;
+      input.maxLength = 24;
       input.dataset.playerIndex = String(i);
       el.playerNameInputs.appendChild(input);
     }
@@ -170,6 +179,7 @@
   );
 
   function runAction(fn) {
+    el.tradeForm.hidden = true; // jede andere Aktion beendet eine offene Tauscheingabe
     try {
       el.statusMessage.textContent = '';
       fn();
@@ -207,6 +217,7 @@
       if (!isNoteworthy(entry)) continue;
       let variant = 'default';
       if (entry.includes('Ereignis aufgedeckt')) variant = 'event';
+      if (entry.includes('kündigt einen Tausch an')) variant = 'trade';
       if (entry.includes('Showdown beginnt') || entry.includes('das Spiel endet')) variant = 'celebrate';
       showToast(entry, variant);
     }
@@ -241,10 +252,12 @@
     if (card.color) div.style.setProperty('--card-accent', card.color);
     if (selected) div.classList.add('selected');
     const isSetCard = card.type === 'object' || card.type === 'mysterio';
+    if (card.type === 'mysterio' && card.effectText) div.title = card.effectText;
     div.innerHTML = `
       ${isSetCard ? `<div class="card-badge">${card.imagePlaceholder} ×${card.setSize}</div>` : ''}
       <div class="placeholder">${cardPlaceholder(card)}</div>
       <div class="card-name">${cardLabel(card)}</div>
+      ${card.type === 'mysterio' ? '<div class="card-effect-hint">✨ Effekt</div>' : ''}
     `;
     if (selectable) {
       div.tabIndex = 0;
@@ -304,7 +317,7 @@
         .join('') || '<em>keine Sets</em>';
 
       box.innerHTML = `
-        <h4>${player.name}<span>${player.hand.length} Karte(n)</span></h4>
+        <h4>${escapeHtml(player.name)}<span>${player.hand.length} Karte(n)</span></h4>
         <div class="groups">${groupsHtml}</div>
       `;
       el.playersArea.appendChild(box);
@@ -402,9 +415,8 @@
       .map(
         (s) => `
         <tr class="${winnerIds.has(s.player.id) ? 'winner' : ''}">
-          <td>${s.player.name}</td>
+          <td>${escapeHtml(s.player.name)}</td>
           <td>${s.setPoints}</td>
-          <td>${s.mysterioBonus}</td>
           <td>${s.handPoints}</td>
           <td>${s.total}</td>
         </tr>`
@@ -413,10 +425,10 @@
 
     el.finalScores.innerHTML = `
       <table>
-        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Mysterio-Bonus</th><th>Handkarten</th><th>Gesamt</th></tr></thead>
+        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Handkarten</th><th>Gesamt</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p><strong>Gewinner:</strong> ${winners.map((w) => w.player.name).join(', ')}</p>
+      <p><strong>Gewinner:</strong> ${winners.map((w) => escapeHtml(w.player.name)).join(', ')}</p>
     `;
   }
 
@@ -424,7 +436,7 @@
     el.logList.innerHTML = game.log
       .slice(-30)
       .reverse()
-      .map((entry) => `<li>${entry}</li>`)
+      .map((entry) => `<li>${escapeHtml(entry)}</li>`)
       .join('');
   }
 
@@ -439,7 +451,7 @@
       .join(', ') || '(leer)';
 
     const hands = game.players
-      .map((p) => `<div><strong>${p.name}:</strong> ${p.hand.map(cardLabel).join(', ') || '(leer)'}</div>`)
+      .map((p) => `<div><strong>${escapeHtml(p.name)}:</strong> ${p.hand.map(cardLabel).join(', ') || '(leer)'}</div>`)
       .join('');
 
     const events = [
@@ -450,14 +462,14 @@
     const allMysterio = game.players
       .map((p) => {
         const owned = p.collection.getGroups().get('Mysterio') || [];
-        return owned.length ? `<div>${p.name}: ${owned.map(cardLabel).join(', ')}</div>` : '';
+        return owned.length ? `<div>${escapeHtml(p.name)}: ${owned.map(cardLabel).join(', ')}</div>` : '';
       })
       .filter(Boolean)
       .join('') || '<div>Noch keine ausgespielt.</div>';
 
     const scores = game
       .calculateScores()
-      .map((s) => `<div>${s.player.name}: ${s.total} Punkte (Sets ${s.setPoints}, Mysterio ${s.mysterioBonus}, Hand ${s.handPoints})</div>`)
+      .map((s) => `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints})</div>`)
       .join('');
 
     el.debugContent.innerHTML = `

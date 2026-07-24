@@ -57,12 +57,18 @@
   //    auch wiederholt für Live-Anzeigen im Debug-Modus.
   //  - drawback({ game, player }) darf Seiteneffekte haben und wird genau
   //    einmal aufgerufen, sobald die Karte ausgespielt wird.
+  //
+  // WICHTIG (V0.1): specialEffect/drawback sind aktuell nur vorbereitet und
+  // werden von rules.js bewusst noch NICHT aufgerufen - effectText zeigt in
+  // der UI schon an, was die Karte einmal tun wird. Die Funktionen bleiben
+  // stehen, damit das Verdrahten später keine Architekturänderung braucht.
   class MysterioCard extends ObjectCard {
-    constructor({ id, name, setName, setSize, imagePlaceholder, specialEffect, drawback }) {
+    constructor({ id, name, setName, setSize, imagePlaceholder, specialEffect, drawback, effectText }) {
       super({ id, name, setName, setSize, imagePlaceholder, color: MYSTERIO_COLOR });
       this.rarity = 'rare';
       this.specialEffect = specialEffect;
       this.drawback = drawback;
+      this.effectText = effectText;
     }
 
     get type() {
@@ -189,24 +195,111 @@
 
   const MYSTERIO_COLOR = '#e8b100';
 
+  // Jede Kategorie steht für einen Flohmarkt-Tisch: ein Emoji, eine Akzentfarbe
+  // und genau `items.length` (== size) konkrete Fundstücke statt Platzhaltertexten.
   const SET_DEFINITIONS = [
-    { name: 'Set A', size: 8, emoji: '🟥', color: '#e03131' },
-    { name: 'Set B', size: 10, emoji: '🟦', color: '#1971c2' },
-    { name: 'Set C', size: 12, emoji: '🟩', color: '#2f9e44' },
-    { name: 'Set D', size: 10, emoji: '🟨', color: '#f08c00' },
-    { name: 'Set E', size: 10, emoji: '🟪', color: '#9c36b5' },
+    {
+      name: 'Bücher & Platten',
+      size: 8,
+      emoji: '📚',
+      color: '#8a5a2f',
+      items: [
+        'Zerfledderter Liebesroman',
+        'Kochbuch von 1987',
+        'Vinyl: Beste Schlager Vol. 3',
+        'Lexikon, Band 7 von 12',
+        'Reiseführer Mallorca \'98',
+        'Angefangenes Kreuzworträtselheft',
+        'Comic ohne Titelseite',
+        'Vergilbtes Telefonbuch',
+      ],
+    },
+    {
+      name: 'Spielzeug & Nostalgie',
+      size: 10,
+      emoji: '🧸',
+      color: '#e8590c',
+      items: [
+        'Einarmiger Teddybär',
+        'Zauberwürfel (ungelöst)',
+        'Blechroboter mit Rost',
+        'Puppe mit Augenklappe',
+        'Kaputtes Kaleidoskop',
+        'Holzpferd auf Rädern',
+        'Handheld-Konsole ohne Akku',
+        'Kreisel mit Delle',
+        'Diabolo-Set, unvollständig',
+        'Matschiges Knautschtier',
+      ],
+    },
+    {
+      name: 'Küche & Haushalt',
+      size: 12,
+      emoji: '🍳',
+      color: '#2f9e44',
+      items: [
+        'Fondue-Set ohne Stecker',
+        'Eieruhr im Hühnerformat',
+        'Emaille-Kanne mit Beule',
+        'Handmixer, Baujahr \'82',
+        'Käseglocke aus Glas',
+        'Suppenteller-Set (3 von 6)',
+        'Toaster mit Eigenleben',
+        'Omas altes Nudelholz',
+        'Raclette-Ofen ohne Pfännchen',
+        'Thermoskanne mit Delle',
+        'Salz-und-Pfeffer-Duo',
+        'Waffeleisen Marke Eigenbau',
+      ],
+    },
+    {
+      name: 'Deko & Kuriositäten',
+      size: 10,
+      emoji: '🏺',
+      color: '#9c36b5',
+      items: [
+        'Grinsender Gartenzwerg',
+        'Lavalampe (halb kaputt)',
+        'Getrocknetes Blumenbouquet',
+        'Schneekugel ohne Schnee',
+        'Muschelsammlung im Glas',
+        'Sonnenuntergangs-Bild',
+        'Schiefer Kerzenständer',
+        'Deko-Anker aus Holz',
+        'Porzellankatze mit Sprung',
+        'Windspiel ohne Wind',
+      ],
+    },
+    {
+      name: 'Kleidung & Accessoires',
+      size: 10,
+      emoji: '👒',
+      color: '#1971c2',
+      items: [
+        'Blumenhut mit Mottenloch',
+        'Krawatte mit Ananas-Muster',
+        'Ausgeleierter Ledergürtel',
+        'Einzelner Handschuh',
+        'Second-Hand-Sakko',
+        'Poncho aus den 70ern',
+        'Sonnenbrille mit Sprung',
+        'Cowboystiefel (nur rechts)',
+        'Retro-Gürteltasche',
+        'Schal mit Fransenproblem',
+      ],
+    },
   ]; // Summe = 50 Objektkarten
 
   function createObjectCards() {
     const cards = [];
     let counter = 1;
     for (const set of SET_DEFINITIONS) {
-      for (let i = 0; i < set.size; i++) {
+      set.items.forEach((itemName) => {
         const idNum = String(counter).padStart(2, '0');
         cards.push(
           new ObjectCard({
             id: `obj-${idNum}`,
-            name: `Karte ${idNum}`,
+            name: itemName,
             setName: set.name,
             setSize: set.size,
             imagePlaceholder: set.emoji,
@@ -214,45 +307,54 @@
           })
         );
         counter++;
-      }
+      });
     }
     return cards;
   }
 
-  // 5 Mysterio-Karten bilden zugleich ihr eigenes seltenes Set ("Mysterio").
+  // 5 Mysterio-Karten bilden zugleich ihr eigenes seltenes Set ("Mysterio") -
+  // mysteriöse Flohmarkt-Legenden, denen man einen Spezialeffekt nachsagt.
+  // effectText beschreibt diesen Effekt bereits als Platzhalter in der UI;
+  // specialEffect/drawback sind vorbereitet, aber laut Vorgabe für V0.1
+  // absichtlich noch nicht verdrahtet (siehe Kommentar an MysterioCard).
   function mysterioEffectDefinitions() {
     return [
       {
-        label: 'Marktgespür',
+        itemName: 'Spiegel mit Eigenwillen',
+        effectText: '✨ Effekt (geplant): +3 Bonuspunkte am Spielende.',
         specialEffect: () => 3,
-        drawback: ({ game, player }) => game._log(`${player.name} zahlt den Preis des Marktgespürs (kein sofortiger Effekt in V0.1).`),
+        drawback: ({ game, player }) => game._log(`${player.name} zahlt den Preis des Spiegels mit Eigenwillen (kein Effekt in V0.1).`),
       },
       {
-        label: 'Glückspilz',
+        itemName: 'Wackelige Kristallkugel',
+        effectText: '✨ Effekt (geplant): +2 Bonuspunkte, kostet aber eine zufällige Handkarte.',
         specialEffect: () => 2,
         drawback: ({ game, player }) => {
           const [card] = player.removeFromHand([player.hand[0]?.id].filter(Boolean));
           if (card) game.discardPile.add(card);
-          game._log(`${player.name} legt durch den Glückspilz-Nachteil eine Handkarte ab.`);
+          game._log(`${player.name} legt durch die wacklige Kristallkugel eine Handkarte ab.`);
         },
       },
       {
-        label: 'Trittbrettfahrer',
+        itemName: 'Anhalter-Amulett',
+        effectText: '✨ Effekt (geplant): +4 Bonuspunkte, ganz ohne Haken.',
         specialEffect: () => 4,
         drawback: () => {},
       },
       {
-        label: 'Schnäppchenjäger',
+        itemName: 'Verbogene Wünschelrute',
+        effectText: '✨ Effekt (geplant): Bonus richtet sich nach der Anzahl deiner Handkarten.',
         specialEffect: ({ player }) => player.hand.length,
-        drawback: ({ game, player }) => game._log(`${player.name} riskiert mit dem Schnäppchenjäger einen unsicheren Bonus.`),
+        drawback: ({ game, player }) => game._log(`${player.name} riskiert mit der verbogenen Wünschelrute einen unsicheren Bonus.`),
       },
       {
-        label: 'Flaschenhals',
+        itemName: 'Truhe mit Eigenleben',
+        effectText: '✨ Effekt (geplant): +5 Bonuspunkte, entfernt aber eine Karte vom Nachziehstapel.',
         specialEffect: () => 5,
         drawback: ({ game }) => {
           const extra = game.drawPile.draw();
           if (extra) game.discardPile.add(extra);
-          game._log('Der Flaschenhals-Effekt entfernt eine Karte vom Nachziehstapel.');
+          game._log('Die Truhe mit Eigenleben entfernt eine Karte vom Nachziehstapel.');
         },
       },
     ];
@@ -265,12 +367,13 @@
       const idNum = String(index + 1).padStart(2, '0');
       return new MysterioCard({
         id: `mys-${idNum}`,
-        name: `Mysterio ${idNum} (${def.label})`,
+        name: def.itemName,
         setName: 'Mysterio',
         setSize,
         imagePlaceholder: '❓',
         specialEffect: def.specialEffect,
         drawback: def.drawback,
+        effectText: def.effectText,
       });
     });
   }
