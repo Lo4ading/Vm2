@@ -18,12 +18,13 @@
   }
 
   class ObjectCard extends Card {
-    constructor({ id, name, setName, setSize, imagePlaceholder }) {
+    constructor({ id, name, setName, setSize, imagePlaceholder, color }) {
       super(id);
       this.name = name;
       this.setName = setName;
       this.setSize = setSize;
       this.imagePlaceholder = imagePlaceholder;
+      this.color = color || '#495057';
       this.points = 1;
     }
 
@@ -58,7 +59,7 @@
   //    einmal aufgerufen, sobald die Karte ausgespielt wird.
   class MysterioCard extends ObjectCard {
     constructor({ id, name, setName, setSize, imagePlaceholder, specialEffect, drawback }) {
-      super({ id, name, setName, setSize, imagePlaceholder });
+      super({ id, name, setName, setSize, imagePlaceholder, color: MYSTERIO_COLOR });
       this.rarity = 'rare';
       this.specialEffect = specialEffect;
       this.drawback = drawback;
@@ -186,12 +187,14 @@
   // Spielmaterial (Platzhalterdaten)
   // ---------------------------------------------------------------------
 
+  const MYSTERIO_COLOR = '#e8b100';
+
   const SET_DEFINITIONS = [
-    { name: 'Set A', size: 8, emoji: '🟥' },
-    { name: 'Set B', size: 10, emoji: '🟦' },
-    { name: 'Set C', size: 12, emoji: '🟩' },
-    { name: 'Set D', size: 10, emoji: '🟨' },
-    { name: 'Set E', size: 10, emoji: '🟪' },
+    { name: 'Set A', size: 8, emoji: '🟥', color: '#e03131' },
+    { name: 'Set B', size: 10, emoji: '🟦', color: '#1971c2' },
+    { name: 'Set C', size: 12, emoji: '🟩', color: '#2f9e44' },
+    { name: 'Set D', size: 10, emoji: '🟨', color: '#f08c00' },
+    { name: 'Set E', size: 10, emoji: '🟪', color: '#9c36b5' },
   ]; // Summe = 50 Objektkarten
 
   function createObjectCards() {
@@ -207,6 +210,7 @@
             setName: set.name,
             setSize: set.size,
             imagePlaceholder: set.emoji,
+            color: set.color,
           })
         );
         counter++;
@@ -276,21 +280,21 @@
     return [
       {
         title: 'Bonuszug',
-        description: 'Der aktive Spieler zieht sofort eine zusätzliche Karte.',
+        description: '📦 Lieferengpass behoben! Der aktive Spieler zieht sofort eine zusätzliche Karte.',
         effect: (game) => {
           const player = game.currentPlayer;
           const card = game.drawPile.draw();
           if (card) {
             player.addCards([card]);
-            game._log(`Bonuszug: ${player.name} zieht eine zusätzliche Karte.`);
+            game._log(`📦 Bonuszug: ${player.name} zieht eine zusätzliche Karte.`);
           } else {
-            game._log('Bonuszug: Nachziehstapel ist leer, kein Effekt.');
+            game._log('📦 Bonuszug: Nachziehstapel ist leer, kein Effekt.');
           }
         },
       },
       {
         title: 'Kollektive Ablage',
-        description: 'Jeder Spieler legt seine älteste Handkarte auf den Friedhof.',
+        description: '🧹 Inventur! Jeder Spieler legt seine älteste Handkarte auf den Friedhof.',
         effect: (game) => {
           for (const player of game.players) {
             const oldest = player.hand[0];
@@ -299,37 +303,37 @@
               game.discardPile.add(oldest);
             }
           }
-          game._log('Kollektive Ablage: alle Spieler legen ihre älteste Handkarte ab.');
+          game._log('🧹 Kollektive Ablage: alle Spieler legen ihre älteste Handkarte ab.');
         },
       },
       {
         title: 'Marktschwankung',
-        description: 'Die obersten zwei Karten des Nachziehstapels wandern auf den Friedhof.',
+        description: '📉 Die Preise crashen! Die obersten zwei Karten des Nachziehstapels wandern auf den Friedhof.',
         effect: (game) => {
           const removed = game.drawPile.drawMany(2);
           game.discardPile.addMany(removed);
-          game._log(`Marktschwankung: ${removed.length} Karte(n) vom Nachziehstapel abgelegt.`);
+          game._log(`📉 Marktschwankung: ${removed.length} Karte(n) vom Nachziehstapel abgelegt.`);
         },
       },
       {
         title: 'Zufallsglück',
-        description: 'Der aktive Spieler nimmt die oberste Karte des Friedhofs auf die Hand.',
+        description: '🍀 Ein Schnäppchen im Ausschuss! Der aktive Spieler nimmt die oberste Karte des Friedhofs auf die Hand.',
         effect: (game) => {
           const player = game.currentPlayer;
           const card = game.discardPile.cards.pop();
           if (card) {
             player.addCards([card]);
-            game._log(`Zufallsglück: ${player.name} holt eine Karte aus dem Friedhof zurück.`);
+            game._log(`🍀 Zufallsglück: ${player.name} holt eine Karte aus dem Friedhof zurück.`);
           } else {
-            game._log('Zufallsglück: Friedhof ist leer, kein Effekt.');
+            game._log('🍀 Zufallsglück: Friedhof ist leer, kein Effekt.');
           }
         },
       },
       {
         title: 'Ruhige Runde',
-        description: 'Nichts passiert. Der Markt macht heute Pause.',
+        description: '☕ Nichts passiert. Der Markt macht heute Pause.',
         effect: (game) => {
-          game._log('Ruhige Runde: kein Effekt.');
+          game._log('☕ Ruhige Runde: kein Effekt.');
         },
       },
     ];

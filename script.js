@@ -10,6 +10,11 @@
   let game = null;
   let selectedCardIds = new Set();
   let debugEnabled = false;
+  let lastLoggedIndex = 0;
+  let announcedCompleteSets = new Set(); // `${playerId}:${setName}`, verhindert wiederholte Feier-Toasts
+  let celebrationFired = false;
+
+  const CONFETTI_EMOJI = ['🎉', '🎊', '✨', '🥳'];
 
   // --- DOM-Referenzen -----------------------------------------------------
   const el = {
@@ -38,6 +43,14 @@
     tradeBtn: document.getElementById('trade-btn'),
     endTurnBtn: document.getElementById('end-turn-btn'),
     newGameBtn: document.getElementById('new-game-btn'),
+
+    tradeForm: document.getElementById('trade-form'),
+    tradeInput: document.getElementById('trade-input'),
+    tradeSubmitBtn: document.getElementById('trade-submit-btn'),
+    tradeCancelBtn: document.getElementById('trade-cancel-btn'),
+
+    toastContainer: document.getElementById('toast-container'),
+    confettiLayer: document.getElementById('confetti-layer'),
 
     discardRequired: document.getElementById('discard-required'),
     discardNeededCount: document.getElementById('discard-needed-count'),
@@ -75,21 +88,25 @@
     game = new Game({ playerCount: count, playerNames: names });
     game.setup();
     selectedCardIds.clear();
+    lastLoggedIndex = game.log.length; // Startmeldung nicht extra als Toast anzeigen
+    announcedCompleteSets.clear();
+    celebrationFired = false;
     window.FlowMarkt.debugGame = game; // Konsolenzugriff für Fehlersuche/Tests
-
-
 
     el.setupScreen.hidden = true;
     el.gameScreen.hidden = false;
+    el.tradeForm.hidden = true;
     render();
   });
 
+  // Kein window.confirm(): in eingebetteten/sandboxed Ansichten (z. B. Artifacts)
+  // werden native Dialoge oft unterdrückt, wodurch der Button sonst wirkungslos wäre.
   el.newGameBtn.addEventListener('click', () => {
-    if (!confirm('Aktuelle Partie verwerfen und neu starten?')) return;
     game = null;
     selectedCardIds.clear();
     el.gameScreen.hidden = true;
     el.setupScreen.hidden = false;
+    el.tradeForm.hidden = true;
   });
 
   el.debugToggle.addEventListener('change', () => {
@@ -110,9 +127,27 @@
     })
   );
 
+  // Kein window.prompt(): ersetzt durch ein eingebettetes Formular, damit der
+  // Button auch in sandboxed Ansichten (z. B. Artifacts) funktioniert.
   el.tradeBtn.addEventListener('click', () => {
-    const offer = prompt('Tauschangebot (optional, wird nur protokolliert):', '') || '';
+    el.tradeForm.hidden = false;
+    el.tradeInput.value = '';
+    el.tradeInput.focus();
+  });
+
+  el.tradeCancelBtn.addEventListener('click', () => {
+    el.tradeForm.hidden = true;
+  });
+
+  el.tradeSubmitBtn.addEventListener('click', () => {
+    const offer = el.tradeInput.value.trim();
+    el.tradeForm.hidden = true;
     runAction(() => game.announceTrade(offer));
+  });
+
+  el.tradeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') el.tradeSubmitBtn.click();
+    if (e.key === 'Escape') el.tradeCancelBtn.click();
   });
 
   el.endTurnBtn.addEventListener('click', () =>
@@ -136,7 +171,53 @@
     } catch (err) {
       el.statusMessage.textContent = err.message;
     }
+    flushLogToasts();
     render();
+  }
+
+  // --- Toasts & Konfetti ("coole Effekte") --------------------------------
+  function showToast(message, variant = 'default') {
+    while (el.toastContainer.children.length >= 4) {
+      el.toastContainer.firstElementChild.remove();
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast${variant !== 'default' ? ` ${variant}` : ''}`;
+    toast.textContent = message;
+    el.toastContainer.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  // Nicht jede Log-Zeile ist eine Überraschung wert - Routine-Aktionen werden gefiltert.
+  function isNoteworthy(entry) {
+    if (/ zieht eine Karte\.$/.test(entry)) return false;
+    if (/ legt \d+ Karte\(n\) auf den Friedhof\.$/.test(entry)) return false;
+    return true;
+  }
+
+  function flushLogToasts() {
+    if (!game) return;
+    const newEntries = game.log.slice(lastLoggedIndex);
+    lastLoggedIndex = game.log.length;
+    for (const entry of newEntries) {
+      if (!isNoteworthy(entry)) continue;
+      let variant = 'default';
+      if (entry.includes('Ereignis aufgedeckt')) variant = 'event';
+      if (entry.includes('Showdown beginnt') || entry.includes('das Spiel endet')) variant = 'celebrate';
+      showToast(entry, variant);
+    }
+  }
+
+  function spawnConfetti() {
+    const count = 28;
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.textContent = CONFETTI_EMOJI[i % CONFETTI_EMOJI.length];
+      piece.style.left = `${Math.random() * 100}%`;
+      piece.style.animationDelay = `${Math.random() * 0.6}s`;
+      el.confettiLayer.appendChild(piece);
+      setTimeout(() => piece.remove(), 3200);
+    }
   }
 
   // --- Rendering ----------------------------------------------------------
@@ -152,11 +233,13 @@
     const div = document.createElement('div');
     div.className = `card ${card.type}`;
     div.dataset.id = card.id;
+    if (card.color) div.style.setProperty('--card-accent', card.color);
     if (selected) div.classList.add('selected');
+    const isSetCard = card.type === 'object' || card.type === 'mysterio';
     div.innerHTML = `
+      ${isSetCard ? `<div class="card-badge">${card.imagePlaceholder} ×${card.setSize}</div>` : ''}
       <div class="placeholder">${cardPlaceholder(card)}</div>
       <div class="card-name">${cardLabel(card)}</div>
-      <div class="card-meta">${card.type === 'object' || card.type === 'mysterio' ? card.setName : ''}</div>
     `;
     if (selectable) {
       div.tabIndex = 0;
@@ -200,7 +283,15 @@
         .map(([setName, cards]) => {
           const setSize = cards[0].setSize;
           const complete = cards.length >= setSize;
-          return `<span class="set-group${complete ? ' complete' : ''}">${setName}: ${cards.length}/${setSize}</span>`;
+          const key = `${player.id}:${setName}`;
+          let justCompleted = false;
+          if (complete && !announcedCompleteSets.has(key)) {
+            announcedCompleteSets.add(key);
+            justCompleted = true;
+            showToast(`🎉 ${player.name}: Set ${cards[0].imagePlaceholder} komplett – Punkte verdoppelt!`, 'celebrate');
+          }
+          const classes = ['set-group', complete && 'complete', justCompleted && 'just-completed'].filter(Boolean).join(' ');
+          return `<span class="${classes}">${cards[0].imagePlaceholder} ${cards.length}/${setSize}</span>`;
         })
         .join('') || '<em>keine Sets</em>';
 
@@ -253,6 +344,11 @@
     const ended = game.phase === 'ended';
     el.endPanel.hidden = !ended;
     if (!ended) return;
+
+    if (!celebrationFired) {
+      celebrationFired = true;
+      spawnConfetti();
+    }
 
     const scores = game.calculateScores();
     const winners = game.getWinner();

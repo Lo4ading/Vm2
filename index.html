@@ -17,6 +17,20 @@
     </label>
   </header>
 
+  <details class="how-to-play">
+    <summary>Wie funktioniert eine Runde?</summary>
+    <ol>
+      <li>Karte ziehen.</li>
+      <li>Beliebig viele passende Sets ausspielen – mindestens 2 zusammengehörige Karten, oder eine einzelne Karte, die ein bereits liegendes Set erweitert. Für jedes ausgespielte Set gibt es sofort eine Bonuskarte.</li>
+      <li>Optional einen Tausch ankündigen (wird nur protokolliert).</li>
+      <li>Mehr als 3 Handkarten? Überzählige Karten verdeckt auf den Friedhof ablegen.</li>
+      <li>Zug beenden – der nächste Spieler ist an der Reihe.</li>
+    </ol>
+    <p>Nach jeder vollständigen Runde wird automatisch eine Ereigniskarte aufgedeckt und ihr Effekt tritt sofort ein.</p>
+    <p>Ist der Nachziehstapel leer, beginnt der <strong>Showdown</strong>: es wird nicht mehr gezogen, nur noch vorhandene Sets ausgespielt. Kann niemand mehr spielen, endet die Partie.</p>
+    <p><strong>Punkte:</strong> Einzelkarte = 1 Punkt · Teilset = Kartenanzahl × Setgröße · komplettes Set = verdoppelt · Mysterio-Karten geben zusätzlichen Bonus.</p>
+  </details>
+
   <section id="setup-screen" class="screen">
     <h2>Neue Partie starten</h2>
     <div class="form-row">
@@ -67,6 +81,12 @@
         <button id="new-game-btn">Neue Partie</button>
       </div>
 
+      <div class="trade-form" id="trade-form" hidden>
+        <input type="text" id="trade-input" placeholder="Tauschangebot (optional, wird nur protokolliert)">
+        <button id="trade-submit-btn" class="primary">Ankündigen</button>
+        <button id="trade-cancel-btn">Abbrechen</button>
+      </div>
+
       <div class="discard-required" id="discard-required" hidden>
         <p>Handkartenlimit überschritten – bitte <span id="discard-needed-count">0</span> Karte(n) auswählen und ablegen.</p>
         <button id="confirm-discard-btn">Ausgewählte Karten ablegen</button>
@@ -92,6 +112,9 @@
 
   </section>
 </div>
+
+<div id="toast-container" aria-live="polite"></div>
+<div id="confetti-layer" aria-hidden="true"></div>
 
 <script src="cards.js"></script>
 <script src="rules.js"></script>
