@@ -1,5 +1,97 @@
 /* style.css — bewusst schlicht gehalten, Fokus liegt auf Spielbarkeit für Playtests */
 
+:root {
+  --bg: #f2f2f0;
+  --surface: #ffffff;
+  --surface-alt: #fafafa;
+  --border: #cccccc;
+  --border-strong: #333333;
+  --text: #1a1a1a;
+  --text-muted: #666666;
+  --accent: #2b6cb0;
+  --accent-strong: #235a92;
+  --accent-soft: #eaf2fb;
+  --success: #2f9e44;
+  --success-soft: #d7f5d7;
+  --warning: #e8b100;
+  --warning-soft: #fff3bf;
+  --danger: #c92a2a;
+  --mysterio-bg: #fff3bf;
+  --event-bg: #e7e0ff;
+  --debug-bg: #1a1a1a;
+  --debug-text: #e8f5e9;
+  --debug-heading: #ffd43b;
+  --debug-subheading: #74c0fc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171a;
+    --surface: #1f2023;
+    --surface-alt: #26272b;
+    --border: #3a3b3f;
+    --border-strong: #cfd2d6;
+    --text: #e8e9ea;
+    --text-muted: #a3a6ab;
+    --accent: #5b9bd9;
+    --accent-strong: #7db2e8;
+    --accent-soft: #223347;
+    --success: #57c26a;
+    --success-soft: #16321d;
+    --warning: #e0b23a;
+    --warning-soft: #3a2f10;
+    --danger: #ff6b6b;
+    --mysterio-bg: #3a3410;
+    --event-bg: #2a2440;
+    --debug-bg: #0d0d0d;
+    --debug-text: #d7f5d7;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #16171a;
+  --surface: #1f2023;
+  --surface-alt: #26272b;
+  --border: #3a3b3f;
+  --border-strong: #cfd2d6;
+  --text: #e8e9ea;
+  --text-muted: #a3a6ab;
+  --accent: #5b9bd9;
+  --accent-strong: #7db2e8;
+  --accent-soft: #223347;
+  --success: #57c26a;
+  --success-soft: #16321d;
+  --warning: #e0b23a;
+  --warning-soft: #3a2f10;
+  --danger: #ff6b6b;
+  --mysterio-bg: #3a3410;
+  --event-bg: #2a2440;
+  --debug-bg: #0d0d0d;
+  --debug-text: #d7f5d7;
+}
+
+:root[data-theme="light"] {
+  --bg: #f2f2f0;
+  --surface: #ffffff;
+  --surface-alt: #fafafa;
+  --border: #cccccc;
+  --border-strong: #333333;
+  --text: #1a1a1a;
+  --text-muted: #666666;
+  --accent: #2b6cb0;
+  --accent-strong: #235a92;
+  --accent-soft: #eaf2fb;
+  --success: #2f9e44;
+  --success-soft: #d7f5d7;
+  --warning: #e8b100;
+  --warning-soft: #fff3bf;
+  --danger: #c92a2a;
+  --mysterio-bg: #fff3bf;
+  --event-bg: #e7e0ff;
+  --debug-bg: #1a1a1a;
+  --debug-text: #e8f5e9;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7,8 +99,8 @@
 body {
   margin: 0;
   font-family: system-ui, Arial, sans-serif;
-  background: #f2f2f0;
-  color: #1a1a1a;
+  background: var(--bg);
+  color: var(--text);
 }
 
 #app {
@@ -21,7 +113,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid #333;
+  border-bottom: 2px solid var(--border-strong);
   padding-bottom: 8px;
   margin-bottom: 16px;
 }
@@ -33,7 +125,7 @@ body {
 
 .version {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-muted);
   font-weight: normal;
 }
 
@@ -43,8 +135,8 @@ body {
 }
 
 .screen {
-  background: #fff;
-  border: 1px solid #ccc;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 16px;
   margin-bottom: 16px;
@@ -64,18 +156,27 @@ body {
   margin: 4px 0;
 }
 
-button {
+button, input[type="number"], input[type="text"] {
   font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+}
+
+input[type="number"], input[type="text"] {
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+button {
   padding: 6px 12px;
   margin: 4px 4px 4px 0;
-  border: 1px solid #333;
   border-radius: 4px;
-  background: #fff;
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  background: #eee;
+  background: var(--surface-alt);
 }
 
 button:disabled {
@@ -84,13 +185,20 @@ button:disabled {
 }
 
 button.primary {
-  background: #2b6cb0;
+  background: var(--accent);
   color: #fff;
-  border-color: #2b6cb0;
+  border-color: var(--accent);
 }
 
 button.primary:hover:not(:disabled) {
-  background: #235a92;
+  background: var(--accent-strong);
+}
+
+button:focus-visible,
+input:focus-visible,
+.card:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .status-bar {
@@ -102,8 +210,8 @@ button.primary:hover:not(:disabled) {
 }
 
 .badge {
-  background: #333;
-  color: #fff;
+  background: var(--border-strong);
+  color: var(--bg);
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 0.8rem;
@@ -118,10 +226,11 @@ button.primary:hover:not(:disabled) {
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .pile {
-  border: 1px dashed #999;
+  border: 1px dashed var(--text-muted);
   border-radius: 6px;
   padding: 8px 12px;
   text-align: center;
@@ -131,17 +240,19 @@ button.primary:hover:not(:disabled) {
 .pile h3 {
   margin: 0 0 6px;
   font-size: 0.85rem;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .pile-count {
   font-size: 1.6rem;
   font-weight: bold;
+  font-variant-numeric: tabular-nums;
 }
 
 .event-card {
   font-size: 0.8rem;
   max-width: 220px;
+  white-space: pre-line;
 }
 
 .players-area {
@@ -152,15 +263,15 @@ button.primary:hover:not(:disabled) {
 }
 
 .player-box {
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
-  background: #fafafa;
+  background: var(--surface-alt);
 }
 
 .player-box.active {
-  border-color: #2b6cb0;
-  background: #eaf2fb;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .player-box h4 {
@@ -171,17 +282,17 @@ button.primary:hover:not(:disabled) {
 
 .set-group {
   display: inline-block;
-  border: 1px solid #bbb;
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 2px 6px;
   margin: 2px 4px 2px 0;
   font-size: 0.8rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .set-group.complete {
-  background: #d7f5d7;
-  border-color: #2f9e44;
+  background: var(--success-soft);
+  border-color: var(--success);
 }
 
 .hand-area {
@@ -198,9 +309,9 @@ button.primary:hover:not(:disabled) {
 .card {
   width: 90px;
   height: 120px;
-  border: 2px solid #333;
+  border: 2px solid var(--border-strong);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -222,23 +333,23 @@ button.primary:hover:not(:disabled) {
 }
 
 .card.mysterio {
-  background: #fff3bf;
+  background: var(--mysterio-bg);
 }
 
 .card.event {
-  background: #e7e0ff;
+  background: var(--event-bg);
 }
 
 .status-message {
   min-height: 22px;
-  color: #c92a2a;
+  color: var(--danger);
   font-size: 0.9rem;
   margin-top: 8px;
 }
 
 .discard-required {
-  background: #fff3bf;
-  border: 1px solid #e8b100;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
   border-radius: 6px;
   padding: 8px 12px;
   margin-top: 8px;
@@ -246,7 +357,7 @@ button.primary:hover:not(:disabled) {
 
 .end-panel {
   margin-top: 16px;
-  border-top: 2px solid #333;
+  border-top: 2px solid var(--border-strong);
   padding-top: 12px;
 }
 
@@ -256,19 +367,19 @@ button.primary:hover:not(:disabled) {
 }
 
 .end-panel th, .end-panel td {
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   padding: 4px 8px;
   text-align: left;
 }
 
 .end-panel tr.winner {
-  background: #d7f5d7;
+  background: var(--success-soft);
   font-weight: bold;
 }
 
 .log-panel {
-  background: #fff;
-  border: 1px solid #ccc;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 12px;
   max-height: 180px;
@@ -288,16 +399,17 @@ button.primary:hover:not(:disabled) {
 }
 
 .debug-panel {
-  background: #1a1a1a;
-  color: #e8f5e9;
+  background: var(--debug-bg);
+  color: var(--debug-text);
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 0.78rem;
+  overflow-x: auto;
 }
 
 .debug-panel h3 {
   margin: 0 0 6px;
-  color: #ffd43b;
+  color: var(--debug-heading);
 }
 
 .debug-panel section {
@@ -306,5 +418,5 @@ button.primary:hover:not(:disabled) {
 
 .debug-panel h4 {
   margin: 0 0 4px;
-  color: #74c0fc;
+  color: var(--debug-subheading);
 }

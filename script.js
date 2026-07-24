@@ -159,7 +159,16 @@
       <div class="card-meta">${card.type === 'object' || card.type === 'mysterio' ? card.setName : ''}</div>
     `;
     if (selectable) {
+      div.tabIndex = 0;
+      div.setAttribute('role', 'button');
+      div.setAttribute('aria-pressed', String(selected));
       div.addEventListener('click', () => onClick(card));
+      div.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick(card);
+        }
+      });
     }
     return div;
   }
