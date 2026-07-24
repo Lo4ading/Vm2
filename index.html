@@ -10,7 +10,10 @@
 <div id="app">
 
   <header class="app-header">
-    <h1>Flow-Markt <span class="version">V0.1 Baseline</span></h1>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🛒</span>
+      <h1>Flow-Markt <span class="version">V0.1</span></h1>
+    </div>
     <label class="debug-toggle">
       <input type="checkbox" id="debug-toggle">
       Debug-Modus
@@ -32,6 +35,7 @@
   </details>
 
   <section id="setup-screen" class="screen">
+    <p class="intro-blurb">Ein humorvolles Sammelspiel für 2–6 Feilscher an einem Bildschirm: Karten ziehen, Sets vervollständigen, seltene Mysterio-Karten ergattern – wer am Ende die meisten Punkte hat, gewinnt den Flow-Markt.</p>
     <h2>Neue Partie starten</h2>
     <div class="form-row">
       <label for="player-count-input">Spieleranzahl</label>
@@ -48,6 +52,8 @@
       <span id="round-label"></span>
       <span id="current-player-label" class="current-player"></span>
     </div>
+
+    <div class="hint-banner" id="hint-banner"></div>
 
     <div class="board">
 
@@ -74,11 +80,11 @@
       </div>
 
       <div class="actions" id="actions">
-        <button id="draw-btn">Karte ziehen</button>
-        <button id="play-set-btn">Set ausspielen</button>
-        <button id="trade-btn">Tausch ankündigen</button>
-        <button id="end-turn-btn">Zug beenden</button>
-        <button id="new-game-btn">Neue Partie</button>
+        <button id="draw-btn" title="Zieht eine Karte vom Nachziehstapel – der erste Schritt jedes Zugs.">🎴 Karte ziehen</button>
+        <button id="play-set-btn" title="Spielt die ausgewählten Handkarten als (Teil-)Set aus.">🃏 Set ausspielen</button>
+        <button id="trade-btn" title="Protokolliert eine Tauschabsicht – ohne Automatik in V0.1.">🤝 Tausch ankündigen</button>
+        <button id="end-turn-btn" title="Beendet deinen Zug, sofern das Handkartenlimit eingehalten ist.">✅ Zug beenden</button>
+        <button id="new-game-btn" title="Verwirft die aktuelle Partie und startet neu.">↺ Neue Partie</button>
       </div>
 
       <div class="trade-form" id="trade-form" hidden>
@@ -89,7 +95,7 @@
 
       <div class="discard-required" id="discard-required" hidden>
         <p>Handkartenlimit überschritten – bitte <span id="discard-needed-count">0</span> Karte(n) auswählen und ablegen.</p>
-        <button id="confirm-discard-btn">Ausgewählte Karten ablegen</button>
+        <button id="confirm-discard-btn" class="primary">Ausgewählte Karten ablegen</button>
       </div>
 
       <div class="status-message" id="status-message"></div>

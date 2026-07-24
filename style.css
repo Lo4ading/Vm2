@@ -1,41 +1,47 @@
-/* style.css — bewusst schlicht gehalten, Fokus liegt auf Spielbarkeit für Playtests */
+/* style.css — Flow-Markt Design-System
+   Palette: warmes Papier-Creme + Markt-Türkis, damit der Akzent nicht mit den
+   fünf Set-Farben (Rot/Blau/Grün/Gold/Violett) kollidiert. */
 
 :root {
-  --bg: #f2f2f0;
+  --bg: #f6f3ec;
   --surface: #ffffff;
-  --surface-alt: #fafafa;
-  --border: #cccccc;
-  --border-strong: #333333;
-  --text: #1a1a1a;
-  --text-muted: #666666;
-  --accent: #2b6cb0;
-  --accent-strong: #235a92;
-  --accent-soft: #eaf2fb;
+  --surface-alt: #efe9dc;
+  --border: #ddd3bd;
+  --border-strong: #2c2620;
+  --text: #241f19;
+  --text-muted: #6f6656;
+  --accent: #0f8a7e;
+  --accent-strong: #0b6b62;
+  --accent-soft: #d9f0ec;
   --success: #2f9e44;
   --success-soft: #d7f5d7;
-  --warning: #e8b100;
-  --warning-soft: #fff3bf;
-  --danger: #c92a2a;
+  --warning: #b8860b;
+  --warning-soft: #fbedc9;
+  --danger: #c1272d;
   --mysterio-bg: #fff3bf;
-  --event-bg: #e7e0ff;
+  --event-bg: #ece3ff;
   --debug-bg: #1a1a1a;
   --debug-text: #e8f5e9;
   --debug-heading: #ffd43b;
   --debug-subheading: #74c0fc;
+
+  --font-display: ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16171a;
-    --surface: #1f2023;
-    --surface-alt: #26272b;
-    --border: #3a3b3f;
-    --border-strong: #cfd2d6;
-    --text: #e8e9ea;
-    --text-muted: #a3a6ab;
-    --accent: #5b9bd9;
-    --accent-strong: #7db2e8;
-    --accent-soft: #223347;
+    --bg: #1c1a16;
+    --surface: #262320;
+    --surface-alt: #2e2a25;
+    --border: #4a4136;
+    --border-strong: #e8e2d5;
+    --text: #f1ece2;
+    --text-muted: #b3a993;
+    --accent: #34c3b5;
+    --accent-strong: #5fd4c8;
+    --accent-soft: #17332f;
     --success: #57c26a;
     --success-soft: #16321d;
     --warning: #e0b23a;
@@ -49,16 +55,16 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #16171a;
-  --surface: #1f2023;
-  --surface-alt: #26272b;
-  --border: #3a3b3f;
-  --border-strong: #cfd2d6;
-  --text: #e8e9ea;
-  --text-muted: #a3a6ab;
-  --accent: #5b9bd9;
-  --accent-strong: #7db2e8;
-  --accent-soft: #223347;
+  --bg: #1c1a16;
+  --surface: #262320;
+  --surface-alt: #2e2a25;
+  --border: #4a4136;
+  --border-strong: #e8e2d5;
+  --text: #f1ece2;
+  --text-muted: #b3a993;
+  --accent: #34c3b5;
+  --accent-strong: #5fd4c8;
+  --accent-soft: #17332f;
   --success: #57c26a;
   --success-soft: #16321d;
   --warning: #e0b23a;
@@ -71,23 +77,23 @@
 }
 
 :root[data-theme="light"] {
-  --bg: #f2f2f0;
+  --bg: #f6f3ec;
   --surface: #ffffff;
-  --surface-alt: #fafafa;
-  --border: #cccccc;
-  --border-strong: #333333;
-  --text: #1a1a1a;
-  --text-muted: #666666;
-  --accent: #2b6cb0;
-  --accent-strong: #235a92;
-  --accent-soft: #eaf2fb;
+  --surface-alt: #efe9dc;
+  --border: #ddd3bd;
+  --border-strong: #2c2620;
+  --text: #241f19;
+  --text-muted: #6f6656;
+  --accent: #0f8a7e;
+  --accent-strong: #0b6b62;
+  --accent-soft: #d9f0ec;
   --success: #2f9e44;
   --success-soft: #d7f5d7;
-  --warning: #e8b100;
-  --warning-soft: #fff3bf;
-  --danger: #c92a2a;
+  --warning: #b8860b;
+  --warning-soft: #fbedc9;
+  --danger: #c1272d;
   --mysterio-bg: #fff3bf;
-  --event-bg: #e7e0ff;
+  --event-bg: #ece3ff;
   --debug-bg: #1a1a1a;
   --debug-text: #e8f5e9;
 }
@@ -98,9 +104,14 @@
 
 body {
   margin: 0;
-  font-family: system-ui, Arial, sans-serif;
+  font-family: var(--font-body);
   background: var(--bg);
   color: var(--text);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  text-wrap: balance;
 }
 
 #app {
@@ -113,20 +124,36 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid var(--border-strong);
-  padding-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 3px solid var(--accent);
+  padding-bottom: 10px;
   margin-bottom: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-mark {
+  font-size: 1.7rem;
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .version {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: normal;
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  vertical-align: super;
 }
 
 .debug-toggle {
@@ -137,9 +164,16 @@ body {
 .screen {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 18px;
   margin-bottom: 16px;
+}
+
+.intro-blurb {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  max-width: 62ch;
+  line-height: 1.5;
 }
 
 .form-row {
@@ -153,6 +187,8 @@ body {
 
 #player-name-inputs input {
   display: block;
+  width: 100%;
+  max-width: 320px;
   margin: 4px 0;
 }
 
@@ -179,6 +215,10 @@ button:hover:not(:disabled) {
   background: var(--surface-alt);
 }
 
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -188,10 +228,17 @@ button.primary {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 button.primary:hover:not(:disabled) {
   background: var(--accent-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 button:focus-visible,
@@ -222,6 +269,20 @@ input:focus-visible,
   font-weight: bold;
 }
 
+.hint-banner {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+}
+
+.hint-banner:empty {
+  display: none;
+}
+
 .piles {
   display: flex;
   gap: 12px;
@@ -244,6 +305,7 @@ input:focus-visible,
 }
 
 .pile-count {
+  font-family: var(--font-mono);
   font-size: 1.6rem;
   font-weight: bold;
   font-variant-numeric: tabular-nums;
@@ -272,6 +334,21 @@ input:focus-visible,
 .player-box.active {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.player-box.just-active {
+  animation: turn-change-pulse 0.6s ease;
+}
+
+@keyframes turn-change-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-box.just-active {
+    animation: none;
+  }
 }
 
 .player-box h4 {
@@ -388,10 +465,22 @@ input:focus-visible,
   background: var(--event-bg);
 }
 
+.card.just-drawn {
+  animation: card-draw-in 0.35s ease;
+}
+
+@keyframes card-draw-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card, .card:hover {
     transition: none;
     transform: none;
+  }
+  .card.just-drawn {
+    animation: none;
   }
 }
 
@@ -408,6 +497,12 @@ input:focus-visible,
   border-radius: 6px;
   padding: 8px 12px;
   margin-top: 8px;
+}
+
+.discard-required .primary {
+  background: var(--warning);
+  border-color: var(--warning);
+  color: #241f19;
 }
 
 .end-panel {

@@ -13,6 +13,8 @@
   let lastLoggedIndex = 0;
   let announcedCompleteSets = new Set(); // `${playerId}:${setName}`, verhindert wiederholte Feier-Toasts
   let celebrationFired = false;
+  let previousHandCardIds = new Set(); // für die Zieh-Einflug-Animation neuer Handkarten
+  let previousActivePlayerIndex = -1; // für den Zugwechsel-Puls
 
   const CONFETTI_EMOJI = ['🎉', '🎊', '✨', '🥳'];
 
@@ -56,6 +58,7 @@
     discardNeededCount: document.getElementById('discard-needed-count'),
     confirmDiscardBtn: document.getElementById('confirm-discard-btn'),
 
+    hintBanner: document.getElementById('hint-banner'),
     statusMessage: document.getElementById('status-message'),
     endPanel: document.getElementById('end-panel'),
     finalScores: document.getElementById('final-scores'),
@@ -91,6 +94,8 @@
     lastLoggedIndex = game.log.length; // Startmeldung nicht extra als Toast anzeigen
     announcedCompleteSets.clear();
     celebrationFired = false;
+    previousHandCardIds.clear();
+    previousActivePlayerIndex = -1;
     window.FlowMarkt.debugGame = game; // Konsolenzugriff für Fehlersuche/Tests
 
     el.setupScreen.hidden = true;
@@ -275,9 +280,12 @@
 
   function renderPlayers() {
     el.playersArea.innerHTML = '';
+    const activeChanged = game.currentPlayerIndex !== previousActivePlayerIndex;
+    previousActivePlayerIndex = game.currentPlayerIndex;
     game.players.forEach((player, index) => {
+      const isActive = index === game.currentPlayerIndex;
       const box = document.createElement('div');
-      box.className = 'player-box' + (index === game.currentPlayerIndex ? ' active' : '');
+      box.className = 'player-box' + (isActive ? ' active' : '') + (isActive && activeChanged ? ' just-active' : '');
 
       const groupsHtml = [...player.collection.getGroups().entries()]
         .map(([setName, cards]) => {
@@ -308,6 +316,7 @@
     el.handCount.textContent = String(player.hand.length);
     el.handLimit.textContent = String(HAND_LIMIT);
     el.handCards.innerHTML = '';
+    const newCardIds = new Set();
     player.hand.forEach((card) => {
       const cardEl = createCardElement(card, {
         selectable: true,
@@ -318,8 +327,31 @@
           render();
         },
       });
+      if (!previousHandCardIds.has(card.id)) cardEl.classList.add('just-drawn');
+      newCardIds.add(card.id);
       el.handCards.appendChild(cardEl);
     });
+    previousHandCardIds = newCardIds;
+  }
+
+  // Ermittelt in Klartext, was als Nächstes zu tun ist - hilft Einsteigern,
+  // ohne die Spielregeln selbst irgendwo zu duplizieren.
+  function computeHint() {
+    if (game.phase === 'ended') return '🏁 Die Partie ist vorbei – die Endwertung steht unten.';
+    if (game.needsDiscard()) {
+      const overflow = game.currentPlayer.hand.length - HAND_LIMIT;
+      return `🗑️ Handkartenlimit überschritten: wähle ${overflow} Karte(n) aus und lege sie ab.`;
+    }
+    if (game.phase === 'playing' && !game.hasDrawnThisTurn) {
+      return '🎴 Ziehe eine Karte, um deinen Zug zu beginnen.';
+    }
+    if (selectedCardIds.size > 0) {
+      return '🃏 Passt die Auswahl? Klicke auf „Set ausspielen“.';
+    }
+    if (game.phase === 'showdown') {
+      return '⏳ Showdown: keine neuen Karten mehr – spiele vorhandene Sets aus oder beende deinen Zug.';
+    }
+    return '👉 Wähle passende Handkarten für ein Set aus oder beende deinen Zug.';
   }
 
   function renderActions() {
@@ -338,6 +370,16 @@
       el.discardNeededCount.textContent = String(overflow);
       el.confirmDiscardBtn.disabled = selectedCardIds.size !== overflow;
     }
+
+    // Hebt die naheliegende nächste Aktion optisch hervor, ohne andere gültige Züge zu sperren.
+    [el.drawBtn, el.playSetBtn, el.endTurnBtn].forEach((btn) => btn.classList.remove('primary'));
+    if (!ended) {
+      if (mustDrawFirst && !needsDiscard) el.drawBtn.classList.add('primary');
+      else if (selectedCardIds.size > 0 && !el.playSetBtn.disabled) el.playSetBtn.classList.add('primary');
+      else if (!needsDiscard && !el.endTurnBtn.disabled) el.endTurnBtn.classList.add('primary');
+    }
+
+    el.hintBanner.textContent = computeHint();
   }
 
   function renderEndPanel() {
