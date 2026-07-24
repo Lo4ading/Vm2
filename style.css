@@ -1,0 +1,310 @@
+/* style.css — bewusst schlicht gehalten, Fokus liegt auf Spielbarkeit für Playtests */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, Arial, sans-serif;
+  background: #f2f2f0;
+  color: #1a1a1a;
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #333;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.version {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: normal;
+}
+
+.debug-toggle {
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.screen {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.form-row {
+  margin-bottom: 8px;
+}
+
+.form-row label {
+  display: inline-block;
+  width: 140px;
+}
+
+#player-name-inputs input {
+  display: block;
+  margin: 4px 0;
+}
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  margin: 4px 4px 4px 0;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #eee;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #2b6cb0;
+  color: #fff;
+  border-color: #2b6cb0;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #235a92;
+}
+
+.status-bar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+
+.badge {
+  background: #333;
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.current-player {
+  font-weight: bold;
+}
+
+.piles {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pile {
+  border: 1px dashed #999;
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-align: center;
+  min-width: 110px;
+}
+
+.pile h3 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.pile-count {
+  font-size: 1.6rem;
+  font-weight: bold;
+}
+
+.event-card {
+  font-size: 0.8rem;
+  max-width: 220px;
+}
+
+.players-area {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.player-box {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fafafa;
+}
+
+.player-box.active {
+  border-color: #2b6cb0;
+  background: #eaf2fb;
+}
+
+.player-box h4 {
+  margin: 0 0 4px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.set-group {
+  display: inline-block;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: 2px 4px 2px 0;
+  font-size: 0.8rem;
+  background: #fff;
+}
+
+.set-group.complete {
+  background: #d7f5d7;
+  border-color: #2f9e44;
+}
+
+.hand-area {
+  margin-bottom: 12px;
+}
+
+.hand-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 90px;
+}
+
+.card {
+  width: 90px;
+  height: 120px;
+  border: 2px solid #333;
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  font-size: 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.card .placeholder {
+  font-size: 1.6rem;
+}
+
+.card.selected {
+  border-color: #e8590c;
+  box-shadow: 0 0 0 2px #e8590c inset;
+}
+
+.card.mysterio {
+  background: #fff3bf;
+}
+
+.card.event {
+  background: #e7e0ff;
+}
+
+.status-message {
+  min-height: 22px;
+  color: #c92a2a;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
+.discard-required {
+  background: #fff3bf;
+  border: 1px solid #e8b100;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+}
+
+.end-panel {
+  margin-top: 16px;
+  border-top: 2px solid #333;
+  padding-top: 12px;
+}
+
+.end-panel table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.end-panel th, .end-panel td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.end-panel tr.winner {
+  background: #d7f5d7;
+  font-weight: bold;
+}
+
+.log-panel {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 12px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.log-panel h3 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+
+#log-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+}
+
+.debug-panel {
+  background: #1a1a1a;
+  color: #e8f5e9;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+}
+
+.debug-panel h3 {
+  margin: 0 0 6px;
+  color: #ffd43b;
+}
+
+.debug-panel section {
+  margin-bottom: 10px;
+}
+
+.debug-panel h4 {
+  margin: 0 0 4px;
+  color: #74c0fc;
+}

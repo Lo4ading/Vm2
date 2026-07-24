@@ -1,0 +1,275 @@
+// rules.js — Spielregeln für Flow-Markt V0.1
+// Enthält Player und Game. Kennt keine DOM-APIs; die UI (script.js) spricht
+// ausschließlich über diese Schnittstelle mit dem Spielzustand.
+
+(function (global) {
+  'use strict';
+
+  const FlowMarkt = global.FlowMarkt || (global.FlowMarkt = {});
+  const { Deck, DiscardPile, Collection, createObjectCards, createMysterioCards, createEventCards } = FlowMarkt;
+
+  const HAND_LIMIT = 3;
+
+  class Player {
+    constructor(id, name) {
+      this.id = id;
+      this.name = name;
+      this.hand = [];
+      this.collection = new Collection();
+      this.handLimit = HAND_LIMIT;
+    }
+
+    addCards(cards) {
+      this.hand.push(...cards);
+    }
+
+    removeFromHand(cardIds) {
+      const ids = new Set(cardIds);
+      const removed = this.hand.filter((c) => ids.has(c.id));
+      this.hand = this.hand.filter((c) => !ids.has(c.id));
+      return removed;
+    }
+
+    isOverHandLimit() {
+      return this.hand.length > this.handLimit;
+    }
+  }
+
+  class Game {
+    constructor({ playerCount = 3, playerNames = [], debug = false } = {}) {
+      this.debug = debug;
+      this.phase = 'setup'; // setup | playing | showdown | ended
+      this.players = [];
+      this.currentPlayerIndex = 0;
+      this.roundNumber = 0;
+      this.hasDrawnThisTurn = false;
+      this.drawPile = null;
+      this.discardPile = new DiscardPile();
+      this.eventDeck = null;
+      this.revealedEvents = [];
+      this.log = [];
+      this._playerCount = playerCount;
+      this._playerNames = playerNames;
+    }
+
+    _log(message) {
+      this.log.push(message);
+      if (this.log.length > 200) this.log.shift();
+    }
+
+    setup() {
+      this.players = [];
+      for (let i = 0; i < this._playerCount; i++) {
+        const name = this._playerNames[i] || `Spieler ${i + 1}`;
+        this.players.push(new Player(`p${i + 1}`, name));
+      }
+
+      const objectCards = createObjectCards();
+      const mysterioCards = createMysterioCards();
+      this.drawPile = new Deck([...objectCards, ...mysterioCards]).shuffle();
+
+      this.eventDeck = new Deck(createEventCards()).shuffle();
+      this.discardPile = new DiscardPile();
+      this.revealedEvents = [];
+      this.currentPlayerIndex = 0;
+      this.roundNumber = 1;
+      this.hasDrawnThisTurn = false;
+      this.log = [];
+
+      for (const player of this.players) {
+        player.hand = [];
+        player.collection = new Collection();
+        player.addCards(this.drawPile.drawMany(2));
+      }
+
+      this.phase = 'playing';
+      this._log('Spiel gestartet.');
+    }
+
+    get currentPlayer() {
+      return this.players[this.currentPlayerIndex];
+    }
+
+    // --- Zugschritt 1: Karte ziehen -------------------------------------
+    drawCard() {
+      if (this.phase !== 'playing') {
+        throw new Error('Im Showdown werden keine Karten mehr gezogen.');
+      }
+      if (this.hasDrawnThisTurn) {
+        throw new Error('In diesem Zug wurde bereits gezogen.');
+      }
+      if (this.drawPile.isEmpty) {
+        this._enterShowdown();
+        return null;
+      }
+      const card = this.drawPile.draw();
+      this.currentPlayer.addCards([card]);
+      this.hasDrawnThisTurn = true;
+      this._log(`${this.currentPlayer.name} zieht eine Karte.`);
+      if (this.drawPile.isEmpty) this._enterShowdown();
+      return card;
+    }
+
+    // --- Zugschritt 2+3: Set ausspielen + Bonuskarte ---------------------
+    playSet(cardIds) {
+      if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
+        throw new Error('Bitte zuerst eine Karte ziehen.');
+      }
+      if (this.phase === 'ended') {
+        throw new Error('Das Spiel ist bereits beendet.');
+      }
+
+      const player = this.currentPlayer;
+      const idSet = new Set(cardIds);
+      const cards = player.hand.filter((c) => idSet.has(c.id));
+      if (cards.length !== cardIds.length || cards.length === 0) {
+        throw new Error('Ungültige Kartenauswahl.');
+      }
+      const setName = cards[0].setName;
+      if (!cards.every((c) => c.setName === setName)) {
+        throw new Error('Alle ausgewählten Karten müssen zum selben Set gehören.');
+      }
+      const existing = player.collection.getGroupSize(setName);
+      if (existing + cards.length < 2) {
+        throw new Error('Ein Set benötigt mindestens 2 Karten (oder ein bereits begonnenes Set).');
+      }
+
+      player.removeFromHand(cardIds);
+      player.collection.addCards(cards);
+      this._log(`${player.name} spielt ${cards.length} Karte(n) im Set "${setName}" aus.`);
+
+      for (const card of cards) {
+        if (card.type === 'mysterio' && typeof card.drawback === 'function') {
+          card.drawback({ game: this, player });
+        }
+      }
+
+      if (this.phase === 'playing') {
+        if (this.drawPile.isEmpty) {
+          this._enterShowdown();
+        } else {
+          const bonus = this.drawPile.draw();
+          player.addCards([bonus]);
+          this._log(`${player.name} zieht eine Bonuskarte für das ausgespielte Set.`);
+          if (this.drawPile.isEmpty) this._enterShowdown();
+        }
+      }
+    }
+
+    // --- Zugschritt 4: Tausch ankündigen (nur Protokoll in V0.1) --------
+    announceTrade(offerDescription = '') {
+      const player = this.currentPlayer;
+      const suffix = offerDescription ? `: ${offerDescription}` : '';
+      this._log(`${player.name} kündigt einen Tausch an${suffix}.`);
+    }
+
+    // --- Zugschritt 5: Handkartenlimit -----------------------------------
+    needsDiscard() {
+      return this.currentPlayer.isOverHandLimit();
+    }
+
+    discardCards(cardIds) {
+      const player = this.currentPlayer;
+      const removed = player.removeFromHand(cardIds);
+      this.discardPile.addMany(removed);
+      this._log(`${player.name} legt ${removed.length} Karte(n) auf den Friedhof.`);
+    }
+
+    // --- Zugschritt 6: Zug beenden ----------------------------------------
+    endTurn() {
+      if (this.phase === 'ended') return;
+      if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
+        throw new Error('Bitte zuerst eine Karte ziehen.');
+      }
+      if (this.needsDiscard()) {
+        throw new Error('Handkartenlimit überschritten – bitte zuerst Karten ablegen.');
+      }
+
+      const wasLastPlayer = this.currentPlayerIndex === this.players.length - 1;
+      this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+      this.hasDrawnThisTurn = false;
+
+      if (wasLastPlayer) {
+        this.roundNumber++;
+        this._resolveEventCard();
+      }
+
+      if (this.phase === 'showdown' && !this._anyoneCanPlaySet()) {
+        this._endGame();
+      }
+    }
+
+    _resolveEventCard() {
+      if (!this.eventDeck || this.eventDeck.isEmpty) return;
+      const card = this.eventDeck.draw();
+      this.revealedEvents.push(card);
+      this._log(`Ereignis aufgedeckt: "${card.title}" – ${card.description}`);
+      try {
+        card.effect(this);
+      } catch (err) {
+        this._log(`Fehler beim Ereigniseffekt: ${err.message}`);
+      }
+    }
+
+    _enterShowdown() {
+      if (this.phase !== 'showdown') {
+        this.phase = 'showdown';
+        this._log('Der Nachziehstapel ist leer – Showdown beginnt!');
+      }
+    }
+
+    _anyoneCanPlaySet() {
+      return this.players.some((p) => this._playerHasPlayableSet(p));
+    }
+
+    _playerHasPlayableSet(player) {
+      const bySetName = new Map();
+      for (const card of player.hand) {
+        if (!bySetName.has(card.setName)) bySetName.set(card.setName, []);
+        bySetName.get(card.setName).push(card);
+      }
+      for (const [setName, cards] of bySetName) {
+        const existing = player.collection.getGroupSize(setName);
+        if (existing > 0 || cards.length >= 2) return true;
+      }
+      return false;
+    }
+
+    _endGame() {
+      this.phase = 'ended';
+      this._log('Niemand kann noch Sets bilden – das Spiel endet.');
+    }
+
+    // --- Wertung -----------------------------------------------------------
+    calculateScores() {
+      return this.players.map((player) => {
+        const { total, breakdown } = player.collection.computeScore();
+        let mysterioBonus = 0;
+        for (const cards of player.collection.getGroups().values()) {
+          for (const card of cards) {
+            if (card.type === 'mysterio' && typeof card.specialEffect === 'function') {
+              mysterioBonus += card.specialEffect({ game: this, player }) || 0;
+            }
+          }
+        }
+        const handPoints = player.hand.reduce((sum, c) => sum + (c.points || 0), 0);
+        return {
+          player,
+          setPoints: total,
+          breakdown,
+          mysterioBonus,
+          handPoints,
+          total: total + mysterioBonus + handPoints,
+        };
+      });
+    }
+
+    getWinner() {
+      const scores = this.calculateScores();
+      const max = Math.max(...scores.map((s) => s.total));
+      return scores.filter((s) => s.total === max);
+    }
+  }
+
+  Object.assign(FlowMarkt, { Player, Game, HAND_LIMIT });
+})(window);

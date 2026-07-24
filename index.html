@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow-Markt – V0.1 Baseline</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="app-header">
+    <h1>Flow-Markt <span class="version">V0.1 Baseline</span></h1>
+    <label class="debug-toggle">
+      <input type="checkbox" id="debug-toggle">
+      Debug-Modus
+    </label>
+  </header>
+
+  <section id="setup-screen" class="screen">
+    <h2>Neue Partie starten</h2>
+    <div class="form-row">
+      <label for="player-count-input">Spieleranzahl</label>
+      <input type="number" id="player-count-input" min="2" max="6" value="3">
+    </div>
+    <div id="player-name-inputs"></div>
+    <button id="start-game-btn" class="primary">Spiel starten</button>
+  </section>
+
+  <section id="game-screen" class="screen" hidden>
+
+    <div class="status-bar">
+      <span id="phase-label" class="badge"></span>
+      <span id="round-label"></span>
+      <span id="current-player-label" class="current-player"></span>
+    </div>
+
+    <div class="board">
+
+      <div class="piles">
+        <div class="pile" id="draw-pile-el">
+          <h3>Nachziehstapel</h3>
+          <div class="pile-count" id="draw-pile-count">0</div>
+        </div>
+        <div class="pile" id="discard-pile-el">
+          <h3>Friedhof</h3>
+          <div class="pile-count" id="discard-pile-count">0</div>
+        </div>
+        <div class="pile pile-event" id="event-pile-el">
+          <h3>Ereigniskarte</h3>
+          <div class="event-card" id="event-card-display">–</div>
+        </div>
+      </div>
+
+      <div class="players-area" id="players-area"></div>
+
+      <div class="hand-area">
+        <h3>Handkarten (<span id="hand-count">0</span>/<span id="hand-limit">3</span>)</h3>
+        <div class="hand-cards" id="hand-cards"></div>
+      </div>
+
+      <div class="actions" id="actions">
+        <button id="draw-btn">Karte ziehen</button>
+        <button id="play-set-btn">Set ausspielen</button>
+        <button id="trade-btn">Tausch ankündigen</button>
+        <button id="end-turn-btn">Zug beenden</button>
+        <button id="new-game-btn">Neue Partie</button>
+      </div>
+
+      <div class="discard-required" id="discard-required" hidden>
+        <p>Handkartenlimit überschritten – bitte <span id="discard-needed-count">0</span> Karte(n) auswählen und ablegen.</p>
+        <button id="confirm-discard-btn">Ausgewählte Karten ablegen</button>
+      </div>
+
+      <div class="status-message" id="status-message"></div>
+
+      <div class="end-panel" id="end-panel" hidden>
+        <h2>Spiel beendet</h2>
+        <div id="final-scores"></div>
+      </div>
+    </div>
+
+    <div class="log-panel">
+      <h3>Verlauf</h3>
+      <ul id="log-list"></ul>
+    </div>
+
+    <div class="debug-panel" id="debug-panel" hidden>
+      <h3>Debug-Modus</h3>
+      <div id="debug-content"></div>
+    </div>
+
+  </section>
+</div>
+
+<script src="cards.js"></script>
+<script src="rules.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
