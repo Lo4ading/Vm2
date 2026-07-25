@@ -477,6 +477,16 @@ input:focus-visible,
   background: var(--event-bg);
 }
 
+.card.ramsch {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--card-accent) 20%, var(--surface)) 0 8px,
+    var(--surface) 8px 16px
+  );
+  border-style: dashed;
+  opacity: 0.85;
+}
+
 .card.just-drawn {
   animation: card-draw-in 0.35s ease;
 }
@@ -607,12 +617,14 @@ input:focus-visible,
 
 /* Sichtbarkeit läuft über die .open-Klasse (nicht über [hidden]), damit keine
    CSS-Spezifität versehentlich mit dem hidden-Attribut kollidieren kann -
-   genau das hatte das Formular zuvor schon einmal dauerhaft sichtbar gehalten. */
-.trade-form {
+   genau das hatte das alte Tauschformular schon einmal dauerhaft offen gehalten. */
+.trade-compose,
+.trade-pending {
   display: none;
 }
 
-.trade-form.open {
+.trade-compose.open,
+.trade-pending.open {
   display: block;
   margin-top: 10px;
   padding: 10px 14px;
@@ -622,26 +634,45 @@ input:focus-visible,
   animation: trade-form-in 0.2s ease;
 }
 
-.trade-form-title {
+.trade-pending.open {
+  background: var(--mysterio-bg);
+  border-color: var(--warning);
+}
+
+.trade-panel-title {
   margin: 0 0 8px;
   font-weight: 600;
 }
 
-.trade-form-title span {
+.trade-panel-title span {
   font-weight: normal;
   color: var(--text-muted);
   font-size: 0.82rem;
 }
 
-.trade-form-row {
+.trade-hint {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.trade-target-row {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 
-.trade-form input {
-  flex: 1;
-  min-width: 200px;
+.trade-target-row button.selected {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.trade-panel-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 @keyframes trade-form-in {
@@ -650,7 +681,8 @@ input:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .trade-form:not([hidden]) {
+  .trade-compose.open,
+  .trade-pending.open {
     animation: none;
   }
 }

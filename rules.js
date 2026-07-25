@@ -6,7 +6,7 @@
   'use strict';
 
   const FlowMarkt = global.FlowMarkt || (global.FlowMarkt = {});
-  const { Deck, DiscardPile, Collection, createObjectCards, createMysterioCards, createEventCards } = FlowMarkt;
+  const { Deck, DiscardPile, Collection, createObjectCards, createMysterioCards, createRamschCards, createEventCards } = FlowMarkt;
 
   const HAND_LIMIT = 3;
 
@@ -50,6 +50,9 @@
       this.log = [];
       this._playerCount = playerCount;
       this._playerNames = playerNames;
+      // { fromPlayerIndex, offeredCardIds, toPlayerIndex } while ein Tausch auf
+      // eine Reaktion wartet; blockiert währenddessen alle anderen Zugaktionen.
+      this.pendingTrade = null;
     }
 
     _log(message) {
@@ -66,7 +69,8 @@
 
       const objectCards = createObjectCards();
       const mysterioCards = createMysterioCards();
-      this.drawPile = new Deck([...objectCards, ...mysterioCards]).shuffle();
+      const ramschCards = createRamschCards();
+      this.drawPile = new Deck([...objectCards, ...mysterioCards, ...ramschCards]).shuffle();
 
       this.eventDeck = new Deck(createEventCards()).shuffle();
       this.discardPile = new DiscardPile();
@@ -74,6 +78,7 @@
       this.currentPlayerIndex = 0;
       this.roundNumber = 1;
       this.hasDrawnThisTurn = false;
+      this.pendingTrade = null;
       this.log = [];
 
       for (const player of this.players) {
@@ -92,6 +97,9 @@
 
     // --- Zugschritt 1: Karte ziehen -------------------------------------
     drawCard() {
+      if (this.pendingTrade) {
+        throw new Error('Bitte zuerst den offenen Tausch klären.');
+      }
       if (this.phase !== 'playing') {
         throw new Error('Im Showdown werden keine Karten mehr gezogen.');
       }
@@ -112,6 +120,9 @@
 
     // --- Zugschritt 2+3: Set ausspielen + Bonuskarte ---------------------
     playSet(cardIds) {
+      if (this.pendingTrade) {
+        throw new Error('Bitte zuerst den offenen Tausch klären.');
+      }
       if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
         throw new Error('Bitte zuerst eine Karte ziehen.');
       }
@@ -128,6 +139,9 @@
       const setName = cards[0].setName;
       if (!cards.every((c) => c.setName === setName)) {
         throw new Error('Alle ausgewählten Karten müssen zum selben Set gehören.');
+      }
+      if (setName === 'Ramsch') {
+        throw new Error('Ramsch-Karten sind wertlos und lassen sich nicht als Set ausspielen - nur ablegen oder verdeckt wegtauschen.');
       }
       const existing = player.collection.getGroupSize(setName);
       if (existing + cards.length < 2) {
@@ -154,11 +168,75 @@
       }
     }
 
-    // --- Zugschritt 4: Tausch ankündigen (nur Protokoll in V0.1) --------
-    announceTrade(offerDescription = '') {
-      const player = this.currentPlayer;
-      const suffix = offerDescription ? `: ${offerDescription}` : '';
-      this._log(`${player.name} kündigt einen Tausch an${suffix}.`);
+    // --- Zugschritt 4: Tausch anbieten -------------------------------------
+    // Verdeckter Tausch: Der Zielspieler sieht die angebotenen Karten nicht,
+    // bevor er reagiert - er kann nur die Anzahl kennen. Damit ist ein Tausch
+    // reines Glücksspiel und Ramsch-Karten lassen sich unbemerkt loswerden.
+    proposeTrade(offeredCardIds, toPlayerIndex) {
+      if (this.pendingTrade) {
+        throw new Error('Es gibt bereits einen offenen Tausch.');
+      }
+      if (this.phase === 'ended') {
+        throw new Error('Das Spiel ist bereits beendet.');
+      }
+      if (this.needsDiscard()) {
+        throw new Error('Bitte zuerst das Handkartenlimit einhalten.');
+      }
+      if (!Number.isInteger(toPlayerIndex) || toPlayerIndex < 0 || toPlayerIndex >= this.players.length) {
+        throw new Error('Ungültiger Zielspieler.');
+      }
+      if (toPlayerIndex === this.currentPlayerIndex) {
+        throw new Error('Du kannst nicht mit dir selbst tauschen.');
+      }
+
+      const fromPlayer = this.currentPlayer;
+      const idSet = new Set(offeredCardIds);
+      const cards = fromPlayer.hand.filter((c) => idSet.has(c.id));
+      if (cards.length !== offeredCardIds.length || cards.length === 0) {
+        throw new Error('Bitte mindestens eine Karte für den Tausch auswählen.');
+      }
+
+      const toPlayer = this.players[toPlayerIndex];
+      this.pendingTrade = {
+        fromPlayerIndex: this.currentPlayerIndex,
+        offeredCardIds: cards.map((c) => c.id),
+        toPlayerIndex,
+      };
+      this._log(`${fromPlayer.name} bietet ${toPlayer.name} ${cards.length} Karte(n) verdeckt zum Tausch an.`);
+    }
+
+    declineTrade() {
+      if (!this.pendingTrade) {
+        throw new Error('Es gibt keinen offenen Tausch.');
+      }
+      const fromPlayer = this.players[this.pendingTrade.fromPlayerIndex];
+      const toPlayer = this.players[this.pendingTrade.toPlayerIndex];
+      this._log(`${toPlayer.name} lehnt den Tausch von ${fromPlayer.name} ab.`);
+      this.pendingTrade = null;
+    }
+
+    acceptTradeWithCounter(counterCardIds) {
+      if (!this.pendingTrade) {
+        throw new Error('Es gibt keinen offenen Tausch.');
+      }
+      const { fromPlayerIndex, offeredCardIds, toPlayerIndex } = this.pendingTrade;
+      const fromPlayer = this.players[fromPlayerIndex];
+      const toPlayer = this.players[toPlayerIndex];
+
+      const idSet = new Set(counterCardIds);
+      const counterCards = toPlayer.hand.filter((c) => idSet.has(c.id));
+      if (counterCards.length !== counterCardIds.length || counterCards.length === 0) {
+        throw new Error('Bitte mindestens eine Gegenkarte auswählen.');
+      }
+
+      const offeredCards = fromPlayer.removeFromHand(offeredCardIds);
+      const givenBack = toPlayer.removeFromHand(counterCards.map((c) => c.id));
+      toPlayer.addCards(offeredCards);
+      fromPlayer.addCards(givenBack);
+      this._log(
+        `${fromPlayer.name} und ${toPlayer.name} tauschen ${offeredCards.length} gegen ${givenBack.length} Karte(n) - erst jetzt sehen beide, was sie bekommen haben.`
+      );
+      this.pendingTrade = null;
     }
 
     // --- Zugschritt 5: Handkartenlimit -----------------------------------
@@ -176,6 +254,9 @@
     // --- Zugschritt 6: Zug beenden ----------------------------------------
     endTurn() {
       if (this.phase === 'ended') return;
+      if (this.pendingTrade) {
+        throw new Error('Bitte zuerst den offenen Tausch klären.');
+      }
       if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
         throw new Error('Bitte zuerst eine Karte ziehen.');
       }
@@ -223,6 +304,7 @@
     _playerHasPlayableSet(player) {
       const bySetName = new Map();
       for (const card of player.hand) {
+        if (card.setName === 'Ramsch') continue; // Ramsch lässt sich nie ausspielen
         if (!bySetName.has(card.setName)) bySetName.set(card.setName, []);
         bySetName.get(card.setName).push(card);
       }

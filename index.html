@@ -25,13 +25,14 @@
     <ol>
       <li>Karte ziehen.</li>
       <li>Beliebig viele passende Sets ausspielen – mindestens 2 zusammengehörige Karten, oder eine einzelne Karte, die ein bereits liegendes Set erweitert. Für jedes ausgespielte Set gibt es sofort eine Bonuskarte.</li>
-      <li>Optional einen Tausch ankündigen (wird nur protokolliert).</li>
+      <li>Optional einen Tausch anbieten: Karte(n) auswählen und einem Mitspieler verdeckt anbieten. Der oder die kann ablehnen oder blind Gegenkarte(n) dazulegen – erst dann sehen beide, was sie bekommen haben.</li>
       <li>Mehr als 3 Handkarten? Überzählige Karten verdeckt auf den Friedhof ablegen.</li>
       <li>Zug beenden – der nächste Spieler ist an der Reihe.</li>
     </ol>
     <p>Nach jeder vollständigen Runde wird automatisch eine Ereigniskarte aufgedeckt und ihr Effekt tritt sofort ein.</p>
     <p>Ist der Nachziehstapel leer, beginnt der <strong>Showdown</strong>: es wird nicht mehr gezogen, nur noch vorhandene Sets ausgespielt. Kann niemand mehr spielen, endet die Partie.</p>
-    <p><strong>Punkte:</strong> Einzelkarte = 1 Punkt · Teilset = Kartenanzahl × Setgröße · komplettes Set = verdoppelt · Mysterio-Karten geben zusätzlichen Bonus.</p>
+    <p><strong>Punkte:</strong> Einzelkarte = 1 Punkt · Teilset = Kartenanzahl × Setgröße · komplettes Set = verdoppelt.</p>
+    <p><strong>Ramsch:</strong> 30% der Fundstücke sind wertloser Ramsch (0 Punkte) und lassen sich nie als Set ausspielen – nur ablegen oder verdeckt wegtauschen. Da man beim Tausch nie sieht, was man bekommt, kann so auch Ramsch den Besitzer wechseln.</p>
   </details>
 
   <section id="setup-screen" class="screen">
@@ -75,24 +76,35 @@
       <div class="players-area" id="players-area"></div>
 
       <div class="hand-area">
-        <h3>Handkarten (<span id="hand-count">0</span>/<span id="hand-limit">3</span>)</h3>
+        <h3 id="hand-area-title">Handkarten (<span id="hand-count">0</span>/<span id="hand-limit">3</span>)</h3>
         <div class="hand-cards" id="hand-cards"></div>
       </div>
 
       <div class="actions" id="actions">
         <button id="draw-btn" type="button" title="Zieht eine Karte vom Nachziehstapel – der erste Schritt jedes Zugs.">🎴 Karte ziehen</button>
         <button id="play-set-btn" type="button" title="Spielt die ausgewählten Handkarten als (Teil-)Set aus.">🃏 Set ausspielen</button>
-        <button id="trade-btn" type="button" title="Protokolliert eine Tauschabsicht – ohne Automatik in V0.1.">🤝 Tausch ankündigen</button>
+        <button id="trade-btn" type="button" title="Wähle Karten aus deiner Hand und biete sie einem anderen Spieler verdeckt zum Tausch an.">🤝 Tausch anbieten</button>
         <button id="end-turn-btn" type="button" title="Beendet deinen Zug, sofern das Handkartenlimit eingehalten ist.">✅ Zug beenden</button>
         <button id="new-game-btn" type="button" title="Verwirft die aktuelle Partie und startet neu.">↺ Neue Partie</button>
       </div>
 
-      <div class="trade-form" id="trade-form">
-        <p class="trade-form-title">🤝 Tauschbörse <span>– wird nur protokolliert, ohne Automatik</span></p>
-        <div class="trade-form-row">
-          <input type="text" id="trade-input" maxlength="80" autocomplete="off" placeholder="z. B. „2 Bücher gegen 1 Deko-Fund“">
-          <button id="trade-submit-btn" class="primary" type="button">Ankündigen</button>
-          <button id="trade-cancel-btn" type="button">Abbrechen</button>
+      <div class="trade-compose" id="trade-compose">
+        <p class="trade-panel-title">🤝 Tauschangebot zusammenstellen <span>– dein Gegenüber sieht die Karten vorher nicht</span></p>
+        <p class="trade-hint">Wähle oben in deiner Hand die Karte(n), die du anbieten möchtest, und ein Ziel:</p>
+        <div class="trade-target-row" id="trade-target-options"></div>
+        <div class="trade-panel-actions">
+          <button id="trade-send-btn" class="primary" type="button">Angebot senden</button>
+          <button id="trade-compose-cancel-btn" type="button">Abbrechen</button>
+        </div>
+      </div>
+
+      <div class="trade-pending" id="trade-pending">
+        <p class="trade-panel-title">🎁 Tauschangebot <span id="trade-pending-summary"></span></p>
+        <p class="trade-hint">Wähle deine Gegenkarte(n) verdeckt aus oder lehne das Angebot ab.</p>
+        <div class="hand-cards" id="trade-response-hand"></div>
+        <div class="trade-panel-actions">
+          <button id="trade-accept-btn" class="primary" type="button">Tausch bestätigen</button>
+          <button id="trade-decline-btn" type="button">Ablehnen</button>
         </div>
       </div>
 

@@ -16,6 +16,14 @@
   let previousHandCardIds = new Set(); // für die Zieh-Einflug-Animation neuer Handkarten
   let previousActivePlayerIndex = -1; // für den Zugwechsel-Puls
 
+  // Tausch-UI-Zustand: 'normal' | 'composing' (Angebot zusammenstellen).
+  // Ein 'pending'-Zustand ergibt sich implizit aus game.pendingTrade und hat
+  // beim Rendern immer Vorrang vor uiMode, siehe currentUiState().
+  let uiMode = 'normal';
+  let tradeOfferSelection = new Set(); // Karten, die gerade als Angebot markiert werden
+  let tradeOfferTargetIndex = null; // Zielspieler-Index für das Angebot
+  let tradeResponseSelection = new Set(); // Gegenkarten beim Reagieren auf ein Angebot
+
   const CONFETTI_EMOJI = ['🎉', '🎊', '✨', '🥳'];
 
   // Spielernamen und Tauschangebote kommen von Nutzereingaben und landen an
@@ -54,10 +62,18 @@
     endTurnBtn: document.getElementById('end-turn-btn'),
     newGameBtn: document.getElementById('new-game-btn'),
 
-    tradeForm: document.getElementById('trade-form'),
-    tradeInput: document.getElementById('trade-input'),
-    tradeSubmitBtn: document.getElementById('trade-submit-btn'),
-    tradeCancelBtn: document.getElementById('trade-cancel-btn'),
+    tradeCompose: document.getElementById('trade-compose'),
+    tradeTargetOptions: document.getElementById('trade-target-options'),
+    tradeSendBtn: document.getElementById('trade-send-btn'),
+    tradeComposeCancelBtn: document.getElementById('trade-compose-cancel-btn'),
+
+    tradePending: document.getElementById('trade-pending'),
+    tradePendingSummary: document.getElementById('trade-pending-summary'),
+    tradeResponseHand: document.getElementById('trade-response-hand'),
+    tradeAcceptBtn: document.getElementById('trade-accept-btn'),
+    tradeDeclineBtn: document.getElementById('trade-decline-btn'),
+
+    handArea: document.querySelector('.hand-area'),
 
     toastContainer: document.getElementById('toast-container'),
     confettiLayer: document.getElementById('confetti-layer'),
@@ -105,11 +121,14 @@
     celebrationFired = false;
     previousHandCardIds.clear();
     previousActivePlayerIndex = -1;
+    uiMode = 'normal';
+    tradeOfferSelection.clear();
+    tradeOfferTargetIndex = null;
+    tradeResponseSelection.clear();
     window.FlowMarkt.debugGame = game; // Konsolenzugriff für Fehlersuche/Tests
 
     el.setupScreen.hidden = true;
     el.gameScreen.hidden = false;
-    setTradeFormOpen(false);
     render();
   });
 
@@ -118,9 +137,12 @@
   el.newGameBtn.addEventListener('click', () => {
     game = null;
     selectedCardIds.clear();
+    uiMode = 'normal';
+    tradeOfferSelection.clear();
+    tradeOfferTargetIndex = null;
+    tradeResponseSelection.clear();
     el.gameScreen.hidden = true;
     el.setupScreen.hidden = false;
-    setTradeFormOpen(false);
   });
 
   el.debugToggle.addEventListener('change', () => {
@@ -141,32 +163,55 @@
     })
   );
 
-  // Kein window.prompt(): ersetzt durch ein eingebettetes Formular, damit der
-  // Button auch in sandboxed Ansichten (z. B. Artifacts) funktioniert.
-  function setTradeFormOpen(open) {
-    el.tradeForm.classList.toggle('open', open);
-  }
-
+  // Verdeckter Tausch, kein window.prompt(): der Spieler stellt ein Angebot aus
+  // eigenen Handkarten zusammen, ein Zielspieler nimmt es (blind, Gegenkarten
+  // ausgewählt ohne das Angebot zu sehen) an oder lehnt ab.
   el.tradeBtn.addEventListener('click', () => {
-    setTradeFormOpen(true);
-    el.tradeInput.value = '';
-    el.tradeInput.focus();
+    uiMode = 'composing';
+    tradeOfferSelection.clear();
+    const opponents = game.players.map((_, i) => i).filter((i) => i !== game.currentPlayerIndex);
+    tradeOfferTargetIndex = opponents.length === 1 ? opponents[0] : null;
+    render();
   });
 
-  el.tradeCancelBtn.addEventListener('click', () => {
-    setTradeFormOpen(false);
+  el.tradeComposeCancelBtn.addEventListener('click', () => {
+    uiMode = 'normal';
+    tradeOfferSelection.clear();
+    tradeOfferTargetIndex = null;
+    render();
   });
 
-  el.tradeSubmitBtn.addEventListener('click', () => {
-    const offer = el.tradeInput.value.trim();
-    setTradeFormOpen(false);
-    runAction(() => game.announceTrade(offer));
-  });
+  el.tradeSendBtn.addEventListener('click', () =>
+    runAction(() => {
+      if (tradeOfferSelection.size === 0) {
+        throw new Error('Bitte zuerst Karte(n) für das Angebot auswählen.');
+      }
+      if (tradeOfferTargetIndex === null) {
+        throw new Error('Bitte einen Zielspieler auswählen.');
+      }
+      game.proposeTrade([...tradeOfferSelection], tradeOfferTargetIndex);
+      uiMode = 'normal';
+      tradeOfferSelection.clear();
+      tradeOfferTargetIndex = null;
+    })
+  );
 
-  el.tradeInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') el.tradeSubmitBtn.click();
-    if (e.key === 'Escape') el.tradeCancelBtn.click();
-  });
+  el.tradeDeclineBtn.addEventListener('click', () =>
+    runAction(() => {
+      game.declineTrade();
+      tradeResponseSelection.clear();
+    })
+  );
+
+  el.tradeAcceptBtn.addEventListener('click', () =>
+    runAction(() => {
+      if (tradeResponseSelection.size === 0) {
+        throw new Error('Bitte zuerst Gegenkarte(n) auswählen.');
+      }
+      game.acceptTradeWithCounter([...tradeResponseSelection]);
+      tradeResponseSelection.clear();
+    })
+  );
 
   el.endTurnBtn.addEventListener('click', () =>
     runAction(() => {
@@ -183,7 +228,6 @@
   );
 
   function runAction(fn) {
-    setTradeFormOpen(false); // jede andere Aktion beendet eine offene Tauscheingabe
     try {
       el.statusMessage.textContent = '';
       fn();
@@ -221,7 +265,7 @@
       if (!isNoteworthy(entry)) continue;
       let variant = 'default';
       if (entry.includes('Ereignis aufgedeckt')) variant = 'event';
-      if (entry.includes('kündigt einen Tausch an')) variant = 'trade';
+      if (entry.includes('Tausch')) variant = 'trade';
       if (entry.includes('Showdown beginnt') || entry.includes('das Spiel endet')) variant = 'celebrate';
       showToast(entry, variant);
     }
@@ -255,7 +299,7 @@
     div.dataset.id = card.id;
     if (card.color) div.style.setProperty('--card-accent', card.color);
     if (selected) div.classList.add('selected');
-    const isSetCard = card.type === 'object' || card.type === 'mysterio';
+    const isSetCard = card.type === 'object' || card.type === 'mysterio' || card.type === 'ramsch';
     if (card.type === 'mysterio' && card.effectText) div.title = card.effectText;
     div.innerHTML = `
       ${isSetCard ? `<div class="card-badge">${card.imagePlaceholder} ×${card.setSize}</div>` : ''}
@@ -328,8 +372,21 @@
     });
   }
 
+  // 'pending' (game.pendingTrade wartet auf Reaktion) hat immer Vorrang vor
+  // 'composing' (Spieler stellt gerade ein Angebot zusammen) vor 'normal'.
+  function currentUiState() {
+    if (game.pendingTrade) return 'pending';
+    if (uiMode === 'composing') return 'composing';
+    return 'normal';
+  }
+
   function renderHand() {
+    const state = currentUiState();
+    el.handArea.hidden = state === 'pending';
+    if (state === 'pending') return; // die Gegenkarten-Auswahl rendert renderTradePanels()
+
     const player = game.currentPlayer;
+    const activeSelection = state === 'composing' ? tradeOfferSelection : selectedCardIds;
     el.handCount.textContent = String(player.hand.length);
     el.handLimit.textContent = String(HAND_LIMIT);
     el.handCards.innerHTML = '';
@@ -337,10 +394,10 @@
     player.hand.forEach((card) => {
       const cardEl = createCardElement(card, {
         selectable: true,
-        selected: selectedCardIds.has(card.id),
+        selected: activeSelection.has(card.id),
         onClick: (c) => {
-          if (selectedCardIds.has(c.id)) selectedCardIds.delete(c.id);
-          else selectedCardIds.add(c.id);
+          if (activeSelection.has(c.id)) activeSelection.delete(c.id);
+          else activeSelection.add(c.id);
           render();
         },
       });
@@ -351,10 +408,76 @@
     previousHandCardIds = newCardIds;
   }
 
+  function renderTradeTargetOptions() {
+    el.tradeTargetOptions.innerHTML = '';
+    game.players.forEach((player, index) => {
+      if (index === game.currentPlayerIndex) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = `${player.name} (${player.hand.length} Karte(n))`;
+      if (index === tradeOfferTargetIndex) btn.classList.add('selected');
+      btn.addEventListener('click', () => {
+        tradeOfferTargetIndex = index;
+        render();
+      });
+      el.tradeTargetOptions.appendChild(btn);
+    });
+  }
+
+  function renderTradeResponseHand() {
+    el.tradeResponseHand.innerHTML = '';
+    if (!game.pendingTrade) return;
+    const responder = game.players[game.pendingTrade.toPlayerIndex];
+    responder.hand.forEach((card) => {
+      const cardEl = createCardElement(card, {
+        selectable: true,
+        selected: tradeResponseSelection.has(card.id),
+        onClick: (c) => {
+          if (tradeResponseSelection.has(c.id)) tradeResponseSelection.delete(c.id);
+          else tradeResponseSelection.add(c.id);
+          render();
+        },
+      });
+      el.tradeResponseHand.appendChild(cardEl);
+    });
+  }
+
+  function renderTradePanels() {
+    const state = currentUiState();
+    el.tradeCompose.classList.toggle('open', state === 'composing');
+    el.tradePending.classList.toggle('open', state === 'pending');
+
+    // Immer aufrufen (nicht nur im 'pending'-Zweig): renderTradeResponseHand()
+    // leert den Container selbst, wenn kein Tausch mehr offen ist - sonst
+    // blieben dort alte, nur per CSS versteckte Kartenelemente im DOM stehen.
+    renderTradeResponseHand();
+
+    if (state === 'composing') {
+      renderTradeTargetOptions();
+      el.tradeSendBtn.disabled = tradeOfferSelection.size === 0 || tradeOfferTargetIndex === null;
+    }
+
+    if (state === 'pending') {
+      const { fromPlayerIndex, offeredCardIds, toPlayerIndex } = game.pendingTrade;
+      const fromPlayer = game.players[fromPlayerIndex];
+      const toPlayer = game.players[toPlayerIndex];
+      el.tradePendingSummary.textContent = `– ${fromPlayer.name} bietet ${toPlayer.name} ${offeredCardIds.length} Karte(n) verdeckt an`;
+      el.tradeAcceptBtn.disabled = tradeResponseSelection.size === 0;
+    }
+  }
+
   // Ermittelt in Klartext, was als Nächstes zu tun ist - hilft Einsteigern,
   // ohne die Spielregeln selbst irgendwo zu duplizieren.
-  function computeHint() {
+  function computeHint(state) {
     if (game.phase === 'ended') return '🏁 Die Partie ist vorbei – die Endwertung steht unten.';
+    if (state === 'pending') {
+      const fromPlayer = game.players[game.pendingTrade.fromPlayerIndex];
+      const toPlayer = game.players[game.pendingTrade.toPlayerIndex];
+      return `🎁 ${toPlayer.name}: Nimmst du das verdeckte Angebot von ${fromPlayer.name} an oder lehnst du ab?`;
+    }
+    if (state === 'composing') {
+      return '🤝 Wähle Handkarte(n) für dein Angebot und ein Ziel, dann sende es ab.';
+    }
     if (game.needsDiscard()) {
       const overflow = game.currentPlayer.hand.length - HAND_LIMIT;
       return `🗑️ Handkartenlimit überschritten: wähle ${overflow} Karte(n) aus und lege sie ab.`;
@@ -372,17 +495,19 @@
   }
 
   function renderActions() {
+    const state = currentUiState();
+    const blocked = state !== 'normal'; // ein offener Tausch pausiert den normalen Zug
     const needsDiscard = game.needsDiscard();
     const ended = game.phase === 'ended';
     const mustDrawFirst = game.phase === 'playing' && !game.hasDrawnThisTurn;
 
-    el.drawBtn.disabled = ended || needsDiscard || game.phase !== 'playing' || game.hasDrawnThisTurn;
-    el.playSetBtn.disabled = ended || needsDiscard || mustDrawFirst || selectedCardIds.size === 0;
-    el.tradeBtn.disabled = ended || needsDiscard;
-    el.endTurnBtn.disabled = ended || needsDiscard || mustDrawFirst;
+    el.drawBtn.disabled = blocked || ended || needsDiscard || game.phase !== 'playing' || game.hasDrawnThisTurn;
+    el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || selectedCardIds.size === 0;
+    el.tradeBtn.disabled = blocked || ended || needsDiscard;
+    el.endTurnBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst;
 
-    el.discardRequired.hidden = !needsDiscard;
-    if (needsDiscard) {
+    el.discardRequired.hidden = !needsDiscard || state !== 'normal';
+    if (needsDiscard && state === 'normal') {
       const overflow = game.currentPlayer.hand.length - HAND_LIMIT;
       el.discardNeededCount.textContent = String(overflow);
       el.confirmDiscardBtn.disabled = selectedCardIds.size !== overflow;
@@ -390,13 +515,13 @@
 
     // Hebt die naheliegende nächste Aktion optisch hervor, ohne andere gültige Züge zu sperren.
     [el.drawBtn, el.playSetBtn, el.endTurnBtn].forEach((btn) => btn.classList.remove('primary'));
-    if (!ended) {
+    if (!ended && state === 'normal') {
       if (mustDrawFirst && !needsDiscard) el.drawBtn.classList.add('primary');
       else if (selectedCardIds.size > 0 && !el.playSetBtn.disabled) el.playSetBtn.classList.add('primary');
       else if (!needsDiscard && !el.endTurnBtn.disabled) el.endTurnBtn.classList.add('primary');
     }
 
-    el.hintBanner.textContent = computeHint();
+    el.hintBanner.textContent = computeHint(state);
   }
 
   function renderEndPanel() {
@@ -476,11 +601,21 @@
       .map((s) => `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints})</div>`)
       .join('');
 
+    let pendingTradeHtml = '<div>Kein offener Tausch.</div>';
+    if (game.pendingTrade) {
+      const { fromPlayerIndex, offeredCardIds, toPlayerIndex } = game.pendingTrade;
+      const fromPlayer = game.players[fromPlayerIndex];
+      const toPlayer = game.players[toPlayerIndex];
+      const offeredNames = fromPlayer.hand.filter((c) => offeredCardIds.includes(c.id)).map(cardLabel).join(', ');
+      pendingTradeHtml = `<div>${escapeHtml(fromPlayer.name)} → ${escapeHtml(toPlayer.name)}: ${escapeHtml(offeredNames)}</div>`;
+    }
+
     el.debugContent.innerHTML = `
       <section><h4>Nachziehstapel (Reihenfolge, oben zuerst)</h4>${drawOrder}</section>
       <section><h4>Alle Spielerhände</h4>${hands}</section>
       <section><h4>Ereigniskarten</h4>${events}</section>
       <section><h4>Mysterio-Karten im Spiel</h4>${allMysterio}</section>
+      <section><h4>Offener Tausch (normalerweise verdeckt)</h4>${pendingTradeHtml}</section>
       <section><h4>Aktuelle Punkte</h4>${scores}</section>
     `;
   }
@@ -491,6 +626,7 @@
     renderPiles();
     renderPlayers();
     renderHand();
+    renderTradePanels();
     renderActions();
     renderEndPanel();
     renderLog();

@@ -18,14 +18,14 @@
   }
 
   class ObjectCard extends Card {
-    constructor({ id, name, setName, setSize, imagePlaceholder, color }) {
+    constructor({ id, name, setName, setSize, imagePlaceholder, color, points = 1 }) {
       super(id);
       this.name = name;
       this.setName = setName;
       this.setSize = setSize;
       this.imagePlaceholder = imagePlaceholder;
       this.color = color || '#495057';
-      this.points = 1;
+      this.points = points;
     }
 
     get type() {
@@ -73,6 +73,20 @@
 
     get type() {
       return 'mysterio';
+    }
+  }
+
+  // Ramsch-Karten: der Krempel, der auf jedem Flohmarkt auch dabei ist.
+  // Sie gehören keinem echten Set an (setName "Ramsch"), zählen 0 Punkte und
+  // können laut rules.js nie als Set ausgespielt werden - die einzigen Wege,
+  // sie wieder loszuwerden, sind Ablegen oder sie verdeckt wegzutauschen.
+  class RamschCard extends ObjectCard {
+    constructor({ id, name, imagePlaceholder, totalCount }) {
+      super({ id, name, setName: 'Ramsch', setSize: totalCount, imagePlaceholder, color: RAMSCH_COLOR, points: 0 });
+    }
+
+    get type() {
+      return 'ramsch';
     }
   }
 
@@ -194,13 +208,17 @@
   // ---------------------------------------------------------------------
 
   const MYSTERIO_COLOR = '#e8b100';
+  const RAMSCH_COLOR = '#6b6255';
 
   // Jede Kategorie steht für einen Flohmarkt-Tisch: ein Emoji, eine Akzentfarbe
   // und genau `items.length` (== size) konkrete Fundstücke statt Platzhaltertexten.
+  // Von den 50 "Objekt"-Slots sind nur 35 echte, setfähige Fundstücke (70%) -
+  // die restlichen 15 (30%) sind separate Ramsch-Karten (siehe unten), weil auf
+  // einem echten Flohmarkt eben nicht alles etwas wert ist.
   const SET_DEFINITIONS = [
     {
       name: 'Bücher & Platten',
-      size: 8,
+      size: 6,
       emoji: '📚',
       color: '#8a5a2f',
       items: [
@@ -210,13 +228,11 @@
         'Lexikon, Band 7 von 12',
         'Reiseführer Mallorca \'98',
         'Angefangenes Kreuzworträtselheft',
-        'Comic ohne Titelseite',
-        'Vergilbtes Telefonbuch',
       ],
     },
     {
       name: 'Spielzeug & Nostalgie',
-      size: 10,
+      size: 7,
       emoji: '🧸',
       color: '#e8590c',
       items: [
@@ -227,14 +243,11 @@
         'Kaputtes Kaleidoskop',
         'Holzpferd auf Rädern',
         'Handheld-Konsole ohne Akku',
-        'Kreisel mit Delle',
-        'Diabolo-Set, unvollständig',
-        'Matschiges Knautschtier',
       ],
     },
     {
       name: 'Küche & Haushalt',
-      size: 12,
+      size: 8,
       emoji: '🍳',
       color: '#2f9e44',
       items: [
@@ -246,15 +259,11 @@
         'Suppenteller-Set (3 von 6)',
         'Toaster mit Eigenleben',
         'Omas altes Nudelholz',
-        'Raclette-Ofen ohne Pfännchen',
-        'Thermoskanne mit Delle',
-        'Salz-und-Pfeffer-Duo',
-        'Waffeleisen Marke Eigenbau',
       ],
     },
     {
       name: 'Deko & Kuriositäten',
-      size: 10,
+      size: 7,
       emoji: '🏺',
       color: '#9c36b5',
       items: [
@@ -265,14 +274,11 @@
         'Muschelsammlung im Glas',
         'Sonnenuntergangs-Bild',
         'Schiefer Kerzenständer',
-        'Deko-Anker aus Holz',
-        'Porzellankatze mit Sprung',
-        'Windspiel ohne Wind',
       ],
     },
     {
       name: 'Kleidung & Accessoires',
-      size: 10,
+      size: 7,
       emoji: '👒',
       color: '#1971c2',
       items: [
@@ -283,12 +289,40 @@
         'Second-Hand-Sakko',
         'Poncho aus den 70ern',
         'Sonnenbrille mit Sprung',
-        'Cowboystiefel (nur rechts)',
-        'Retro-Gürteltasche',
-        'Schal mit Fransenproblem',
       ],
     },
-  ]; // Summe = 50 Objektkarten
+  ]; // Summe = 35 echte Objektkarten (+ 15 Ramsch-Karten = 50)
+
+  // 30%-Ramsch-Anteil: eigenständige, wertlose Fundstücke ohne Set-Zugehörigkeit.
+  const RAMSCH_ITEMS = [
+    'Einzelne Socke',
+    'Rostiger Nagel',
+    'Leere Streichholzschachtel',
+    'Verblasstes Preisschild',
+    'Kabel ohne Stecker',
+    'Zerrissene Plastiktüte',
+    'Angebrochene Kerze',
+    'Verbogene Büroklammer',
+    'Fleckiger Bierdeckel',
+    'Leere Batterie',
+    'Lose Schraube',
+    'Unlesbare Werbebroschüre',
+    'Kaputter Kugelschreiber',
+    'Verstaubtes Preisschild-Etikett',
+    'Angerissene Serviette',
+  ];
+
+  function createRamschCards() {
+    return RAMSCH_ITEMS.map((itemName, index) => {
+      const idNum = String(index + 1).padStart(2, '0');
+      return new RamschCard({
+        id: `ram-${idNum}`,
+        name: itemName,
+        imagePlaceholder: '🗑️',
+        totalCount: RAMSCH_ITEMS.length,
+      });
+    });
+  }
 
   function createObjectCards() {
     const cards = [];
@@ -465,12 +499,14 @@
     ObjectCard,
     EventCard,
     MysterioCard,
+    RamschCard,
     Deck,
     DiscardPile,
     Collection,
     SET_DEFINITIONS,
     createObjectCards,
     createMysterioCards,
+    createRamschCards,
     createEventCards,
   });
 })(window);
