@@ -53,6 +53,10 @@
       // { fromPlayerIndex, offeredCardIds, toPlayerIndex } while ein Tausch auf
       // eine Reaktion wartet; blockiert währenddessen alle anderen Zugaktionen.
       this.pendingTrade = null;
+      // Die aufgedeckte EventCard, solange ihr Effekt noch nicht bestätigt
+      // wurde (siehe acknowledgePendingEvent) - blockiert ebenfalls den Zug,
+      // damit das Popup in der UI erzwungen werden kann.
+      this.pendingEvent = null;
     }
 
     _log(message) {
@@ -79,6 +83,7 @@
       this.roundNumber = 1;
       this.hasDrawnThisTurn = false;
       this.pendingTrade = null;
+      this.pendingEvent = null;
       this.log = [];
 
       for (const player of this.players) {
@@ -95,11 +100,20 @@
       return this.players[this.currentPlayerIndex];
     }
 
-    // --- Zugschritt 1: Karte ziehen -------------------------------------
-    drawCard() {
+    // Ein offener Tausch oder ein noch nicht bestätigtes Ereignis pausiert
+    // den Zug komplett, bis die UI ihn (per Popup/Panel) aufgelöst hat.
+    _assertNoPendingInterrupt() {
+      if (this.pendingEvent) {
+        throw new Error('Bitte zuerst das Ereignis bestätigen.');
+      }
       if (this.pendingTrade) {
         throw new Error('Bitte zuerst den offenen Tausch klären.');
       }
+    }
+
+    // --- Zugschritt 1: Karte ziehen -------------------------------------
+    drawCard() {
+      this._assertNoPendingInterrupt();
       if (this.phase !== 'playing') {
         throw new Error('Im Showdown werden keine Karten mehr gezogen.');
       }
@@ -120,9 +134,7 @@
 
     // --- Zugschritt 2+3: Set ausspielen + Bonuskarte ---------------------
     playSet(cardIds) {
-      if (this.pendingTrade) {
-        throw new Error('Bitte zuerst den offenen Tausch klären.');
-      }
+      this._assertNoPendingInterrupt();
       if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
         throw new Error('Bitte zuerst eine Karte ziehen.');
       }
@@ -173,6 +185,9 @@
     // bevor er reagiert - er kann nur die Anzahl kennen. Damit ist ein Tausch
     // reines Glücksspiel und Ramsch-Karten lassen sich unbemerkt loswerden.
     proposeTrade(offeredCardIds, toPlayerIndex) {
+      if (this.pendingEvent) {
+        throw new Error('Bitte zuerst das Ereignis bestätigen.');
+      }
       if (this.pendingTrade) {
         throw new Error('Es gibt bereits einen offenen Tausch.');
       }
@@ -254,9 +269,7 @@
     // --- Zugschritt 6: Zug beenden ----------------------------------------
     endTurn() {
       if (this.phase === 'ended') return;
-      if (this.pendingTrade) {
-        throw new Error('Bitte zuerst den offenen Tausch klären.');
-      }
+      this._assertNoPendingInterrupt();
       if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
         throw new Error('Bitte zuerst eine Karte ziehen.');
       }
@@ -270,23 +283,43 @@
 
       if (wasLastPlayer) {
         this.roundNumber++;
-        this._resolveEventCard();
+        this._revealEventCard(); // deckt nur auf, wendet den Effekt noch nicht an
       }
 
-      if (this.phase === 'showdown' && !this._anyoneCanPlaySet()) {
-        this._endGame();
+      // Läuft ein Ereignis-Popup, wartet die Showdown-Prüfung, bis es
+      // bestätigt wurde (acknowledgePendingEvent) - der Effekt könnte
+      // Handkarten verändern, die für die Prüfung relevant sind.
+      if (!this.pendingEvent) {
+        this._checkShowdownEnd();
       }
     }
 
-    _resolveEventCard() {
+    _revealEventCard() {
       if (!this.eventDeck || this.eventDeck.isEmpty) return;
       const card = this.eventDeck.draw();
       this.revealedEvents.push(card);
+      this.pendingEvent = card;
       this._log(`Ereignis aufgedeckt: "${card.title}" – ${card.description}`);
+    }
+
+    // Von der UI aufgerufen, sobald das Ereignis-Popup mit "OK" bestätigt wurde.
+    acknowledgePendingEvent() {
+      if (!this.pendingEvent) {
+        throw new Error('Es gibt kein offenes Ereignis.');
+      }
+      const card = this.pendingEvent;
       try {
         card.effect(this);
       } catch (err) {
         this._log(`Fehler beim Ereigniseffekt: ${err.message}`);
+      }
+      this.pendingEvent = null;
+      this._checkShowdownEnd();
+    }
+
+    _checkShowdownEnd() {
+      if (this.phase === 'showdown' && !this._anyoneCanPlaySet()) {
+        this._endGame();
       }
     }
 

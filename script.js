@@ -90,6 +90,11 @@
     logList: document.getElementById('log-list'),
     debugPanel: document.getElementById('debug-panel'),
     debugContent: document.getElementById('debug-content'),
+
+    eventModal: document.getElementById('event-modal'),
+    eventModalTitle: document.getElementById('event-modal-title'),
+    eventModalDescription: document.getElementById('event-modal-description'),
+    eventModalOkBtn: document.getElementById('event-modal-ok-btn'),
   };
 
   // --- Setup-Bildschirm -----------------------------------------------------
@@ -226,6 +231,11 @@
       selectedCardIds.clear();
     })
   );
+
+  // Das Ereignis-Popup lässt sich bewusst nur über den OK-Button schließen
+  // (kein Klick auf den Hintergrund, kein Escape) - es soll aktiv bestätigt
+  // werden, nicht versehentlich weggeklickt werden können.
+  el.eventModalOkBtn.addEventListener('click', () => runAction(() => game.acknowledgePendingEvent()));
 
   function runAction(fn) {
     try {
@@ -372,9 +382,12 @@
     });
   }
 
-  // 'pending' (game.pendingTrade wartet auf Reaktion) hat immer Vorrang vor
-  // 'composing' (Spieler stellt gerade ein Angebot zusammen) vor 'normal'.
+  // 'event' (Popup wartet auf OK) hat Vorrang vor 'pending' (game.pendingTrade
+  // wartet auf Reaktion) vor 'composing' (Angebot wird zusammengestellt) vor
+  // 'normal'. Ein Event und ein Tausch können laut rules.js nie gleichzeitig
+  // offen sein, die Reihenfolge ist trotzdem defensiv so gewählt.
   function currentUiState() {
+    if (game.pendingEvent) return 'event';
     if (game.pendingTrade) return 'pending';
     if (uiMode === 'composing') return 'composing';
     return 'normal';
@@ -470,6 +483,9 @@
   // ohne die Spielregeln selbst irgendwo zu duplizieren.
   function computeHint(state) {
     if (game.phase === 'ended') return '🏁 Die Partie ist vorbei – die Endwertung steht unten.';
+    if (state === 'event') {
+      return '📣 Ereignis aufgedeckt – im Popup mit „OK“ bestätigen.';
+    }
     if (state === 'pending') {
       const fromPlayer = game.players[game.pendingTrade.fromPlayerIndex];
       const toPlayer = game.players[game.pendingTrade.toPlayerIndex];
@@ -620,6 +636,17 @@
     `;
   }
 
+  function renderEventModal() {
+    const isOpen = !!game.pendingEvent;
+    const wasOpen = el.eventModal.classList.contains('open');
+    el.eventModal.classList.toggle('open', isOpen);
+    if (isOpen) {
+      el.eventModalTitle.textContent = game.pendingEvent.title;
+      el.eventModalDescription.textContent = game.pendingEvent.description;
+      if (!wasOpen) el.eventModalOkBtn.focus();
+    }
+  }
+
   function render() {
     if (!game) return;
     renderStatusBar();
@@ -631,6 +658,7 @@
     renderEndPanel();
     renderLog();
     renderDebugPanel();
+    renderEventModal();
   }
 
   renderNameInputs();
