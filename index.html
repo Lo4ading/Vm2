@@ -42,7 +42,7 @@
       <input type="number" id="player-count-input" min="2" max="6" value="3">
     </div>
     <div id="player-name-inputs"></div>
-    <button id="start-game-btn" class="primary">Spiel starten</button>
+    <button id="start-game-btn" class="primary" type="button">Spiel starten</button>
   </section>
 
   <section id="game-screen" class="screen" hidden>
@@ -80,25 +80,25 @@
       </div>
 
       <div class="actions" id="actions">
-        <button id="draw-btn" title="Zieht eine Karte vom Nachziehstapel – der erste Schritt jedes Zugs.">🎴 Karte ziehen</button>
-        <button id="play-set-btn" title="Spielt die ausgewählten Handkarten als (Teil-)Set aus.">🃏 Set ausspielen</button>
-        <button id="trade-btn" title="Protokolliert eine Tauschabsicht – ohne Automatik in V0.1.">🤝 Tausch ankündigen</button>
-        <button id="end-turn-btn" title="Beendet deinen Zug, sofern das Handkartenlimit eingehalten ist.">✅ Zug beenden</button>
-        <button id="new-game-btn" title="Verwirft die aktuelle Partie und startet neu.">↺ Neue Partie</button>
+        <button id="draw-btn" type="button" title="Zieht eine Karte vom Nachziehstapel – der erste Schritt jedes Zugs.">🎴 Karte ziehen</button>
+        <button id="play-set-btn" type="button" title="Spielt die ausgewählten Handkarten als (Teil-)Set aus.">🃏 Set ausspielen</button>
+        <button id="trade-btn" type="button" title="Protokolliert eine Tauschabsicht – ohne Automatik in V0.1.">🤝 Tausch ankündigen</button>
+        <button id="end-turn-btn" type="button" title="Beendet deinen Zug, sofern das Handkartenlimit eingehalten ist.">✅ Zug beenden</button>
+        <button id="new-game-btn" type="button" title="Verwirft die aktuelle Partie und startet neu.">↺ Neue Partie</button>
       </div>
 
-      <div class="trade-form" id="trade-form" hidden>
+      <div class="trade-form" id="trade-form">
         <p class="trade-form-title">🤝 Tauschbörse <span>– wird nur protokolliert, ohne Automatik</span></p>
         <div class="trade-form-row">
-          <input type="text" id="trade-input" maxlength="80" placeholder="z. B. „2 Bücher gegen 1 Deko-Fund“">
-          <button id="trade-submit-btn" class="primary">Ankündigen</button>
-          <button id="trade-cancel-btn">Abbrechen</button>
+          <input type="text" id="trade-input" maxlength="80" autocomplete="off" placeholder="z. B. „2 Bücher gegen 1 Deko-Fund“">
+          <button id="trade-submit-btn" class="primary" type="button">Ankündigen</button>
+          <button id="trade-cancel-btn" type="button">Abbrechen</button>
         </div>
       </div>
 
       <div class="discard-required" id="discard-required" hidden>
         <p>Handkartenlimit überschritten – bitte <span id="discard-needed-count">0</span> Karte(n) auswählen und ablegen.</p>
-        <button id="confirm-discard-btn" class="primary">Ausgewählte Karten ablegen</button>
+        <button id="confirm-discard-btn" class="primary" type="button">Ausgewählte Karten ablegen</button>
       </div>
 
       <div class="status-message" id="status-message"></div>

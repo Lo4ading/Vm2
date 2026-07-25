@@ -605,7 +605,14 @@ input:focus-visible,
   color: var(--text-muted);
 }
 
-.trade-form:not([hidden]) {
+/* Sichtbarkeit läuft über die .open-Klasse (nicht über [hidden]), damit keine
+   CSS-Spezifität versehentlich mit dem hidden-Attribut kollidieren kann -
+   genau das hatte das Formular zuvor schon einmal dauerhaft sichtbar gehalten. */
+.trade-form {
+  display: none;
+}
+
+.trade-form.open {
   display: block;
   margin-top: 10px;
   padding: 10px 14px;

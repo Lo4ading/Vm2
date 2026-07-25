@@ -109,7 +109,7 @@
 
     el.setupScreen.hidden = true;
     el.gameScreen.hidden = false;
-    el.tradeForm.hidden = true;
+    setTradeFormOpen(false);
     render();
   });
 
@@ -120,7 +120,7 @@
     selectedCardIds.clear();
     el.gameScreen.hidden = true;
     el.setupScreen.hidden = false;
-    el.tradeForm.hidden = true;
+    setTradeFormOpen(false);
   });
 
   el.debugToggle.addEventListener('change', () => {
@@ -143,19 +143,23 @@
 
   // Kein window.prompt(): ersetzt durch ein eingebettetes Formular, damit der
   // Button auch in sandboxed Ansichten (z. B. Artifacts) funktioniert.
+  function setTradeFormOpen(open) {
+    el.tradeForm.classList.toggle('open', open);
+  }
+
   el.tradeBtn.addEventListener('click', () => {
-    el.tradeForm.hidden = false;
+    setTradeFormOpen(true);
     el.tradeInput.value = '';
     el.tradeInput.focus();
   });
 
   el.tradeCancelBtn.addEventListener('click', () => {
-    el.tradeForm.hidden = true;
+    setTradeFormOpen(false);
   });
 
   el.tradeSubmitBtn.addEventListener('click', () => {
     const offer = el.tradeInput.value.trim();
-    el.tradeForm.hidden = true;
+    setTradeFormOpen(false);
     runAction(() => game.announceTrade(offer));
   });
 
@@ -179,7 +183,7 @@
   );
 
   function runAction(fn) {
-    el.tradeForm.hidden = true; // jede andere Aktion beendet eine offene Tauscheingabe
+    setTradeFormOpen(false); // jede andere Aktion beendet eine offene Tauscheingabe
     try {
       el.statusMessage.textContent = '';
       fn();
@@ -494,4 +498,18 @@
   }
 
   renderNameInputs();
+
+  // Sicherheitsnetz: eine unerwartete Ausnahme irgendwo im Code soll sichtbares
+  // Feedback geben statt die Seite scheinbar "einfrieren" zu lassen, ohne dass
+  // erkennbar ist, warum Buttons plötzlich nicht mehr reagieren.
+  window.addEventListener('error', (e) => {
+    if (el.statusMessage) {
+      el.statusMessage.textContent = `Unerwarteter Fehler: ${e.message}. Bitte Seite neu laden, falls sie nicht mehr reagiert.`;
+    }
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    if (el.statusMessage) {
+      el.statusMessage.textContent = `Unerwarteter Fehler: ${e.reason?.message || e.reason}. Bitte Seite neu laden, falls sie nicht mehr reagiert.`;
+    }
+  });
 })();
