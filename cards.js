@@ -77,9 +77,11 @@
   }
 
   // Ramsch-Karten: der Krempel, der auf jedem Flohmarkt auch dabei ist.
-  // Sie gehören keinem echten Set an (setName "Ramsch"), zählen 0 Punkte und
-  // können laut rules.js nie als Set ausgespielt werden - die einzigen Wege,
-  // sie wieder loszuwerden, sind Ablegen oder sie verdeckt wegzutauschen.
+  // Sie gehören keinem echten Set an (setName "Ramsch") und zählen einzeln
+  // 0 Punkte. Ab zwei Karten lassen sie sich wie ein normales Set ausspielen,
+  // geben dabei aber keine Bonuskarte (siehe rules.js) und werden flach mit
+  // 1 Punkt pro Karte gewertet (siehe Collection.computeScore) - spielbar,
+  // aber klar schwächer als ein echtes Set.
   class RamschCard extends ObjectCard {
     constructor({ id, name, imagePlaceholder, totalCount }) {
       super({ id, name, setName: 'Ramsch', setSize: totalCount, imagePlaceholder, color: RAMSCH_COLOR, points: 0 });
@@ -181,7 +183,10 @@
     }
 
     // Punktewertung: Einzelkarte = 1 Punkt, teilweises Set = Anzahl × Setgröße,
-    // vollständiges Set = (Anzahl × Setgröße) × 2.
+    // vollständiges Set = (Anzahl × Setgröße) × 2. Ramsch ist bewusst die
+    // Ausnahme: flach 1 Punkt pro ausgespielter Karte, ohne Multiplikator -
+    // spielbar und nicht mehr toter Ballast, aber klar schwächer als ein
+    // echtes Set (das zusätzlich noch eine Bonuskarte einbringt).
     computeScore() {
       let total = 0;
       const breakdown = [];
@@ -189,7 +194,9 @@
         const setSize = cards[0].setSize;
         const count = cards.length;
         let points;
-        if (count <= 1) {
+        if (setName === 'Ramsch') {
+          points = count;
+        } else if (count <= 1) {
           points = count * (cards[0]?.points || 1);
         } else if (count >= setSize) {
           points = count * setSize * 2;

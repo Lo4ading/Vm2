@@ -140,9 +140,6 @@
       if (!cards.every((c) => c.setName === setName)) {
         throw new Error('Alle ausgewählten Karten müssen zum selben Set gehören.');
       }
-      if (setName === 'Ramsch') {
-        throw new Error('Ramsch-Karten sind wertlos und lassen sich nicht als Set ausspielen - nur ablegen oder verdeckt wegtauschen.');
-      }
       const existing = player.collection.getGroupSize(setName);
       if (existing + cards.length < 2) {
         throw new Error('Ein Set benötigt mindestens 2 Karten (oder ein bereits begonnenes Set).');
@@ -156,7 +153,10 @@
       // ihre specialEffect/drawback-Funktionen werden für V0.1 aber bewusst
       // noch nicht ausgelöst - das Verdrahten folgt in einer späteren Version.
 
-      if (this.phase === 'playing') {
+      // Ramsch ist spielbar (siehe Collection.computeScore für die flache
+      // Wertung), gibt aber bewusst keine Bonuskarte - das bleibt echten
+      // Sets vorbehalten, damit Ramsch klar die schwächere Wahl bleibt.
+      if (this.phase === 'playing' && setName !== 'Ramsch') {
         if (this.drawPile.isEmpty) {
           this._enterShowdown();
         } else {
@@ -304,7 +304,6 @@
     _playerHasPlayableSet(player) {
       const bySetName = new Map();
       for (const card of player.hand) {
-        if (card.setName === 'Ramsch') continue; // Ramsch lässt sich nie ausspielen
         if (!bySetName.has(card.setName)) bySetName.set(card.setName, []);
         bySetName.get(card.setName).push(card);
       }
