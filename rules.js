@@ -6,9 +6,20 @@
   'use strict';
 
   const FlowMarkt = global.FlowMarkt || (global.FlowMarkt = {});
-  const { Deck, DiscardPile, Collection, createObjectCards, createMysterioCards, createRamschCards, createEventCards } = FlowMarkt;
+  const {
+    Deck,
+    DiscardPile,
+    Collection,
+    createObjectCards,
+    createMysterioCards,
+    createRamschCards,
+    createEventCards,
+    SET_DEFINITIONS,
+  } = FlowMarkt;
 
   const HAND_LIMIT = 3;
+  const SECRET_GOAL_BONUS = 15;
+  const SET_GOALS = Object.fromEntries(SET_DEFINITIONS.map((s) => [s.name, s.goal]));
 
   class Player {
     constructor(id, name) {
@@ -17,6 +28,9 @@
       this.hand = [];
       this.collection = new Collection();
       this.handLimit = HAND_LIMIT;
+      // Privates Sammelziel ("Kundenwunsch"), von Game.setup() zugewiesen -
+      // nur der jeweilige Spieler bekommt es während der Partie angezeigt.
+      this.secretGoal = null;
     }
 
     addCards(cards) {
@@ -43,6 +57,9 @@
       this.currentPlayerIndex = 0;
       this.roundNumber = 0;
       this.hasDrawnThisTurn = false;
+      // Höchstens 1 Bonuskarte pro Zug, egal wie viele Sets gespielt werden -
+      // dämpft den Schneeball-Effekt (mehr Sets → mehr Karten → noch mehr Sets).
+      this.bonusDrawGrantedThisTurn = false;
       this.drawPile = null;
       this.discardPile = new DiscardPile();
       this.eventDeck = null;
@@ -82,15 +99,22 @@
       this.currentPlayerIndex = 0;
       this.roundNumber = 1;
       this.hasDrawnThisTurn = false;
+      this.bonusDrawGrantedThisTurn = false;
       this.pendingTrade = null;
       this.pendingEvent = null;
       this.log = [];
 
-      for (const player of this.players) {
+      // Kundenwunsch: jeder Spieler bekommt eine zufällige, private
+      // Zielkategorie (per Deck-Shuffle für dieselbe geprüfte Zufallslogik
+      // wie beim Kartenmischen). Bei mehr Spielern als Kategorien wiederholt
+      // sich die Liste einfach.
+      const shuffledGoals = new Deck(SET_DEFINITIONS.map((s) => s.name)).shuffle().cards;
+      this.players.forEach((player, i) => {
         player.hand = [];
         player.collection = new Collection();
+        player.secretGoal = shuffledGoals[i % shuffledGoals.length];
         player.addCards(this.drawPile.drawMany(2));
-      }
+      });
 
       this.phase = 'playing';
       this._log('Spiel gestartet.');
@@ -168,16 +192,56 @@
       // Ramsch ist spielbar (siehe Collection.computeScore für die flache
       // Wertung), gibt aber bewusst keine Bonuskarte - das bleibt echten
       // Sets vorbehalten, damit Ramsch klar die schwächere Wahl bleibt.
-      if (this.phase === 'playing' && setName !== 'Ramsch') {
+      // Pro Zug gibt es höchstens 1 Bonuskarte, egal wie viele Sets folgen.
+      if (this.phase === 'playing' && setName !== 'Ramsch' && !this.bonusDrawGrantedThisTurn) {
         if (this.drawPile.isEmpty) {
           this._enterShowdown();
         } else {
           const bonus = this.drawPile.draw();
           player.addCards([bonus]);
+          this.bonusDrawGrantedThisTurn = true;
           this._log(`${player.name} zieht eine Bonuskarte für das ausgespielte Set.`);
           if (this.drawPile.isEmpty) this._enterShowdown();
         }
       }
+    }
+
+    // --- Optionale Zusatzaktion: Trödeln -----------------------------------
+    // Legt genau 2 Handkarten (beliebiger Art, auch Ramsch) auf den Friedhof
+    // und zieht dafür 1 neue Karte - gibt Spielern mit einer wertlosen Hand
+    // immer eine sinnvolle Handlung, statt nur zu ziehen und wieder abzulegen.
+    // Wie ein Set zählt das als Zugaktion und ist im Showdown nicht möglich
+    // (dort wird grundsätzlich nicht mehr gezogen).
+    declutter(cardIds) {
+      this._assertNoPendingInterrupt();
+      if (this.phase !== 'playing') {
+        throw new Error('Trödeln ist im Showdown nicht mehr möglich, es wird nicht mehr gezogen.');
+      }
+      if (!this.hasDrawnThisTurn) {
+        throw new Error('Bitte zuerst eine Karte ziehen.');
+      }
+      if (cardIds.length !== 2) {
+        throw new Error('Bitte genau 2 Karten für den Trödel auswählen.');
+      }
+
+      const player = this.currentPlayer;
+      const idSet = new Set(cardIds);
+      const cards = player.hand.filter((c) => idSet.has(c.id));
+      if (cards.length !== 2) {
+        throw new Error('Ungültige Kartenauswahl.');
+      }
+
+      player.removeFromHand(cardIds);
+      this.discardPile.addMany(cards);
+      this._log(`${player.name} trödelt 2 Karte(n) gegen 1 neue.`);
+
+      if (this.drawPile.isEmpty) {
+        this._enterShowdown();
+        return;
+      }
+      const card = this.drawPile.draw();
+      player.addCards([card]);
+      if (this.drawPile.isEmpty) this._enterShowdown();
     }
 
     // --- Zugschritt 4: Tausch anbieten -------------------------------------
@@ -280,9 +344,11 @@
       const wasLastPlayer = this.currentPlayerIndex === this.players.length - 1;
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
       this.hasDrawnThisTurn = false;
+      this.bonusDrawGrantedThisTurn = false;
 
       if (wasLastPlayer) {
         this.roundNumber++;
+        this._grantCatchUpBonus();
         this._revealEventCard(); // deckt nur auf, wendet den Effekt noch nicht an
       }
 
@@ -291,6 +357,27 @@
       // Handkarten verändern, die für die Prüfung relevant sind.
       if (!this.pendingEvent) {
         this._checkShowdownEnd();
+      }
+    }
+
+    // Nachzügler-Bonus: wer bei Rundenwechsel den niedrigsten Punktestand hat,
+    // zieht 1 Karte extra (still, ohne Popup) - dämpft den Bonuskarten-
+    // Schneeball etwas, indem der Rückstand nicht nur größer werden kann.
+    // Bei einem Gleichstand (z. B. Runde 1, alle bei 0) bekommen alle
+    // Betroffenen die Karte, was sich gegenseitig neutralisiert.
+    _grantCatchUpBonus() {
+      if (this.phase !== 'playing' || this.drawPile.isEmpty) return;
+      const scores = this.calculateScores();
+      const lowest = Math.min(...scores.map((s) => s.total));
+      const trailingPlayers = scores.filter((s) => s.total === lowest).map((s) => s.player);
+      for (const player of trailingPlayers) {
+        if (this.drawPile.isEmpty) {
+          this._enterShowdown();
+          break;
+        }
+        const card = this.drawPile.draw();
+        player.addCards([card]);
+        this._log(`🐢 Nachzügler-Bonus: ${player.name} zieht 1 Karte extra (niedrigster Punktestand).`);
       }
     }
 
@@ -360,12 +447,17 @@
       return this.players.map((player) => {
         const { total, breakdown } = player.collection.computeScore();
         const handPoints = player.hand.reduce((sum, c) => sum + (c.points || 0), 0);
+        const goal = SET_GOALS[player.secretGoal];
+        const secretGoalMet = Boolean(goal) && player.collection.getGroupSize(player.secretGoal) >= goal;
+        const secretGoalBonus = secretGoalMet ? SECRET_GOAL_BONUS : 0;
         return {
           player,
           setPoints: total,
           breakdown,
           handPoints,
-          total: total + handPoints,
+          secretGoalMet,
+          secretGoalBonus,
+          total: total + handPoints + secretGoalBonus,
         };
       });
     }

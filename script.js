@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const { Game, HAND_LIMIT } = window.FlowMarkt;
+  const { Game, HAND_LIMIT, SET_DEFINITIONS } = window.FlowMarkt;
 
   let game = null;
   let selectedCardIds = new Set();
@@ -58,9 +58,12 @@
 
     drawBtn: document.getElementById('draw-btn'),
     playSetBtn: document.getElementById('play-set-btn'),
+    declutterBtn: document.getElementById('declutter-btn'),
     tradeBtn: document.getElementById('trade-btn'),
     endTurnBtn: document.getElementById('end-turn-btn'),
     newGameBtn: document.getElementById('new-game-btn'),
+
+    secretGoalBadge: document.getElementById('secret-goal-badge'),
 
     tradeCompose: document.getElementById('trade-compose'),
     tradeTargetOptions: document.getElementById('trade-target-options'),
@@ -164,6 +167,16 @@
         throw new Error('Bitte zuerst Handkarten auswählen.');
       }
       game.playSet([...selectedCardIds]);
+      selectedCardIds.clear();
+    })
+  );
+
+  el.declutterBtn.addEventListener('click', () =>
+    runAction(() => {
+      if (selectedCardIds.size !== 2) {
+        throw new Error('Bitte genau 2 Karten für den Trödel auswählen.');
+      }
+      game.declutter([...selectedCardIds]);
       selectedCardIds.clear();
     })
   );
@@ -349,6 +362,24 @@
       : 'Noch keine aufgedeckt';
   }
 
+  // Der Kundenwunsch ist privat: nur während des eigenen Zugs sichtbar, nicht
+  // im gemeinsamen Spielerbereich für alle - erst die Endwertung deckt alles auf.
+  function renderSecretGoalBadge() {
+    if (game.phase === 'ended') {
+      el.secretGoalBadge.textContent = '';
+      return;
+    }
+    const player = game.currentPlayer;
+    const goalDef = SET_DEFINITIONS.find((s) => s.name === player.secretGoal);
+    if (!goalDef) {
+      el.secretGoalBadge.textContent = '';
+      return;
+    }
+    const owned = player.collection.getGroupSize(player.secretGoal);
+    const met = owned >= goalDef.goal;
+    el.secretGoalBadge.textContent = `🎯 Kundenwunsch von ${player.name}: ${goalDef.emoji} ${goalDef.name} (${owned}/${goalDef.goal})${met ? ' ✅ erfüllt!' : ''}`;
+  }
+
   function renderPlayers() {
     el.playersArea.innerHTML = '';
     const activeChanged = game.currentPlayerIndex !== previousActivePlayerIndex;
@@ -360,8 +391,8 @@
 
       const groupsHtml = [...player.collection.getGroups().entries()]
         .map(([setName, cards]) => {
-          const setSize = cards[0].setSize;
-          const complete = cards.length >= setSize;
+          const goal = cards[0].setGoal || cards[0].setSize;
+          const complete = cards.length >= goal;
           const key = `${player.id}:${setName}`;
           let justCompleted = false;
           if (complete && !announcedCompleteSets.has(key)) {
@@ -370,7 +401,7 @@
             showToast(`🎉 ${player.name}: Set ${cards[0].imagePlaceholder} komplett – Punkte verdoppelt!`, 'celebrate');
           }
           const classes = ['set-group', complete && 'complete', justCompleted && 'just-completed'].filter(Boolean).join(' ');
-          return `<span class="${classes}">${cards[0].imagePlaceholder} ${cards.length}/${setSize}</span>`;
+          return `<span class="${classes}">${cards[0].imagePlaceholder} ${cards.length}/${goal}</span>`;
         })
         .join('') || '<em>keine Sets</em>';
 
@@ -519,6 +550,8 @@
 
     el.drawBtn.disabled = blocked || ended || needsDiscard || game.phase !== 'playing' || game.hasDrawnThisTurn;
     el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || selectedCardIds.size === 0;
+    el.declutterBtn.disabled =
+      blocked || ended || needsDiscard || mustDrawFirst || game.phase !== 'playing' || selectedCardIds.size !== 2;
     el.tradeBtn.disabled = blocked || ended || needsDiscard;
     el.endTurnBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst;
 
@@ -557,20 +590,25 @@
     const rows = scores
       .slice()
       .sort((a, b) => b.total - a.total)
-      .map(
-        (s) => `
+      .map((s) => {
+        const goalDef = SET_DEFINITIONS.find((g) => g.name === s.player.secretGoal);
+        const goalLabel = goalDef
+          ? `${goalDef.emoji} ${escapeHtml(goalDef.name)} ${s.secretGoalMet ? '✅ +' + s.secretGoalBonus : '❌'}`
+          : '–';
+        return `
         <tr class="${winnerIds.has(s.player.id) ? 'winner' : ''}">
           <td>${escapeHtml(s.player.name)}</td>
           <td>${s.setPoints}</td>
           <td>${s.handPoints}</td>
+          <td>${goalLabel}</td>
           <td>${s.total}</td>
-        </tr>`
-      )
+        </tr>`;
+      })
       .join('');
 
     el.finalScores.innerHTML = `
       <table>
-        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Handkarten</th><th>Gesamt</th></tr></thead>
+        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Handkarten</th><th>Kundenwunsch</th><th>Gesamt</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <p><strong>Gewinner:</strong> ${winners.map((w) => escapeHtml(w.player.name)).join(', ')}</p>
@@ -614,7 +652,14 @@
 
     const scores = game
       .calculateScores()
-      .map((s) => `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints})</div>`)
+      .map(
+        (s) =>
+          `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints}, Kundenwunsch ${s.secretGoalMet ? '✅' : '❌'})</div>`
+      )
+      .join('');
+
+    const secretGoals = game.players
+      .map((p) => `<div>${escapeHtml(p.name)}: ${escapeHtml(p.secretGoal || '–')}</div>`)
       .join('');
 
     let pendingTradeHtml = '<div>Kein offener Tausch.</div>';
@@ -632,6 +677,7 @@
       <section><h4>Ereigniskarten</h4>${events}</section>
       <section><h4>Mysterio-Karten im Spiel</h4>${allMysterio}</section>
       <section><h4>Offener Tausch (normalerweise verdeckt)</h4>${pendingTradeHtml}</section>
+      <section><h4>Kundenwünsche (normalerweise privat)</h4>${secretGoals}</section>
       <section><h4>Aktuelle Punkte</h4>${scores}</section>
     `;
   }
@@ -651,6 +697,7 @@
     if (!game) return;
     renderStatusBar();
     renderPiles();
+    renderSecretGoalBadge();
     renderPlayers();
     renderHand();
     renderTradePanels();

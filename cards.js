@@ -18,11 +18,16 @@
   }
 
   class ObjectCard extends Card {
-    constructor({ id, name, setName, setSize, imagePlaceholder, color, points = 1 }) {
+    // setSize = physische Gesamtzahl dieser Karte im Spiel (Anzeige/Badge).
+    // setGoal = wie viele davon zum "vollständigen Set" (×2-Bonus) reichen -
+    // bewusst kleiner als setSize, damit der Bonus erreichbar bleibt. Fällt
+    // auf setSize zurück, wenn nicht gesetzt (z. B. bei Mysterio).
+    constructor({ id, name, setName, setSize, setGoal, imagePlaceholder, color, points = 1 }) {
       super(id);
       this.name = name;
       this.setName = setName;
       this.setSize = setSize;
+      this.setGoal = setGoal || setSize;
       this.imagePlaceholder = imagePlaceholder;
       this.color = color || '#495057';
       this.points = points;
@@ -183,27 +188,32 @@
     }
 
     // Punktewertung: Einzelkarte = 1 Punkt, teilweises Set = Anzahl × Setgröße,
-    // vollständiges Set = (Anzahl × Setgröße) × 2. Ramsch ist bewusst die
-    // Ausnahme: flach 1 Punkt pro ausgespielter Karte, ohne Multiplikator -
-    // spielbar und nicht mehr toter Ballast, aber klar schwächer als ein
-    // echtes Set (das zusätzlich noch eine Bonuskarte einbringt).
+    // vollständiges Set (ab setGoal erreichten Karten) = (Anzahl × Setgröße) × 2.
+    // setGoal ist absichtlich kleiner als die physische Setgröße, damit der
+    // ×2-Bonus in einer normalen Partie auch wirklich erreichbar ist - der
+    // Multiplikator bleibt trotzdem an der vollen Setgröße, das frühere
+    // Erreichen wird also spürbar belohnt. Ramsch ist die Ausnahme: flach
+    // 1 Punkt pro ausgespielter Karte, ohne Multiplikator - spielbar und
+    // nicht mehr toter Ballast, aber klar schwächer als ein echtes Set (das
+    // zusätzlich noch eine Bonuskarte einbringt).
     computeScore() {
       let total = 0;
       const breakdown = [];
       for (const [setName, cards] of this.groups) {
         const setSize = cards[0].setSize;
+        const goal = cards[0].setGoal || setSize;
         const count = cards.length;
         let points;
         if (setName === 'Ramsch') {
           points = count;
         } else if (count <= 1) {
           points = count * (cards[0]?.points || 1);
-        } else if (count >= setSize) {
+        } else if (count >= goal) {
           points = count * setSize * 2;
         } else {
           points = count * setSize;
         }
-        breakdown.push({ setName, count, setSize, isComplete: count >= setSize, points });
+        breakdown.push({ setName, count, setSize, goal, isComplete: count >= goal, points });
         total += points;
       }
       return { total, breakdown };
@@ -222,10 +232,14 @@
   // Von den 50 "Objekt"-Slots sind nur 35 echte, setfähige Fundstücke (70%) -
   // die restlichen 15 (30%) sind separate Ramsch-Karten (siehe unten), weil auf
   // einem echten Flohmarkt eben nicht alles etwas wert ist.
+  // goal = ab wie vielen Karten der ×2-Bonus greift (siehe Collection.computeScore) -
+  // bewusst rund die Hälfte von size, damit "vollständig" in einer normalen
+  // Partie überhaupt erreichbar ist.
   const SET_DEFINITIONS = [
     {
       name: 'Bücher & Platten',
       size: 6,
+      goal: 3,
       emoji: '📚',
       color: '#8a5a2f',
       items: [
@@ -240,6 +254,7 @@
     {
       name: 'Spielzeug & Nostalgie',
       size: 7,
+      goal: 4,
       emoji: '🧸',
       color: '#e8590c',
       items: [
@@ -255,6 +270,7 @@
     {
       name: 'Küche & Haushalt',
       size: 8,
+      goal: 4,
       emoji: '🍳',
       color: '#2f9e44',
       items: [
@@ -271,6 +287,7 @@
     {
       name: 'Deko & Kuriositäten',
       size: 7,
+      goal: 4,
       emoji: '🏺',
       color: '#9c36b5',
       items: [
@@ -286,6 +303,7 @@
     {
       name: 'Kleidung & Accessoires',
       size: 7,
+      goal: 4,
       emoji: '👒',
       color: '#1971c2',
       items: [
@@ -343,6 +361,7 @@
             name: itemName,
             setName: set.name,
             setSize: set.size,
+            setGoal: set.goal,
             imagePlaceholder: set.emoji,
             color: set.color,
           })
