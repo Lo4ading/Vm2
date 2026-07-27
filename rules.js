@@ -74,6 +74,9 @@
       // wurde (siehe acknowledgePendingEvent) - blockiert ebenfalls den Zug,
       // damit das Popup in der UI erzwungen werden kann.
       this.pendingEvent = null;
+      // { id, label, description } einer "Twist"-Ereigniskarte, aktiv bis
+      // das nächste Ereignis aufgedeckt wird (siehe acknowledgePendingEvent).
+      this.activeModifier = null;
     }
 
     _log(message) {
@@ -102,6 +105,7 @@
       this.bonusDrawGrantedThisTurn = false;
       this.pendingTrade = null;
       this.pendingEvent = null;
+      this.activeModifier = null;
       this.log = [];
 
       // Kundenwunsch: jeder Spieler bekommt eine zufällige, private
@@ -124,13 +128,15 @@
       return this.players[this.currentPlayerIndex];
     }
 
-    // Ein offener Tausch oder ein noch nicht bestätigtes Ereignis pausiert
-    // den Zug komplett, bis die UI ihn (per Popup/Panel) aufgelöst hat.
+    // Ein noch nicht bestätigtes Ereignis pausiert immer den ganzen Zug (das
+    // Popup ist global). Ein offener Tausch pausiert nur, wenn der aktuelle
+    // Spieler auch der Zielspieler ist - alle anderen spielen normal weiter,
+    // bis der Tausch bei ihrem eigenen Zug ansteht (siehe proposeTrade).
     _assertNoPendingInterrupt() {
       if (this.pendingEvent) {
         throw new Error('Bitte zuerst das Ereignis bestätigen.');
       }
-      if (this.pendingTrade) {
+      if (this.pendingTrade && this.pendingTrade.toPlayerIndex === this.currentPlayerIndex) {
         throw new Error('Bitte zuerst den offenen Tausch klären.');
       }
     }
@@ -144,14 +150,27 @@
       if (this.hasDrawnThisTurn) {
         throw new Error('In diesem Zug wurde bereits gezogen.');
       }
+
+      const player = this.currentPlayer;
+      // Twist-Ereignis "Ramsch-Pflicht": vor dem Ziehen muss eine Ramsch-Karte
+      // abgegeben werden, falls vorhanden - wer keine hat, zieht kostenlos.
+      if (this.activeModifier?.id === 'ramsch-pflicht') {
+        const ramsch = player.hand.find((c) => c.setName === 'Ramsch');
+        if (ramsch) {
+          player.removeFromHand([ramsch.id]);
+          this.discardPile.add(ramsch);
+          this._log(`🗑️ ${player.name} opfert eine Ramsch-Karte, um ziehen zu dürfen.`);
+        }
+      }
+
       if (this.drawPile.isEmpty) {
         this._enterShowdown();
         return null;
       }
       const card = this.drawPile.draw();
-      this.currentPlayer.addCards([card]);
+      player.addCards([card]);
       this.hasDrawnThisTurn = true;
-      this._log(`${this.currentPlayer.name} zieht eine Karte.`);
+      this._log(`${player.name} zieht eine Karte.`);
       if (this.drawPile.isEmpty) this._enterShowdown();
       return card;
     }
@@ -165,8 +184,14 @@
       if (this.phase === 'ended') {
         throw new Error('Das Spiel ist bereits beendet.');
       }
+      if (this.activeModifier?.id === 'verkaufsstopp') {
+        throw new Error('Verkaufsstopp: Aktuell dürfen keine Sets ausgespielt werden.');
+      }
 
       const player = this.currentPlayer;
+      if (this.activeModifier?.id === 'nur-fuer-profis' && player.collection.getAllCards().length === 0) {
+        throw new Error('Nur für Profis: Du musst zuerst mindestens ein Set gespielt haben.');
+      }
       const idSet = new Set(cardIds);
       const cards = player.hand.filter((c) => idSet.has(c.id));
       if (cards.length !== cardIds.length || cards.length === 0) {
@@ -192,8 +217,10 @@
       // Ramsch ist spielbar (siehe Collection.computeScore für die flache
       // Wertung), gibt aber bewusst keine Bonuskarte - das bleibt echten
       // Sets vorbehalten, damit Ramsch klar die schwächere Wahl bleibt.
+      // Ausnahme: während "Ramsch-Boom" gibt auch Ramsch eine Bonuskarte.
       // Pro Zug gibt es höchstens 1 Bonuskarte, egal wie viele Sets folgen.
-      if (this.phase === 'playing' && setName !== 'Ramsch' && !this.bonusDrawGrantedThisTurn) {
+      const ramschBoom = this.activeModifier?.id === 'ramsch-boom';
+      if (this.phase === 'playing' && (setName !== 'Ramsch' || ramschBoom) && !this.bonusDrawGrantedThisTurn) {
         if (this.drawPile.isEmpty) {
           this._enterShowdown();
         } else {
@@ -248,15 +275,24 @@
     // Verdeckter Tausch: Der Zielspieler sieht die angebotenen Karten nicht,
     // bevor er reagiert - er kann nur die Anzahl kennen. Damit ist ein Tausch
     // reines Glücksspiel und Ramsch-Karten lassen sich unbemerkt loswerden.
+    //
+    // Ein Angebot ist die einzige Aktion des Zugs: es beendet den Zug sofort
+    // (ein Spieler tauscht also höchstens einmal pro Zug an). Die angebotenen
+    // Karten bleiben bis zur Reaktion in der Hand des Anbietenden - "gesperrt"
+    // sind sie nicht, aber niemand kann in der Zwischenzeit an den Tausch
+    // heran, weil nur der Zielspieler reagieren darf (siehe declineTrade/
+    // acceptTradeWithCounter) und der erst wieder an der Reihe sein muss.
+    // Andere Spieler spielen bis dahin ganz normal weiter.
     proposeTrade(offeredCardIds, toPlayerIndex) {
-      if (this.pendingEvent) {
-        throw new Error('Bitte zuerst das Ereignis bestätigen.');
-      }
+      this._assertNoPendingInterrupt();
       if (this.pendingTrade) {
         throw new Error('Es gibt bereits einen offenen Tausch.');
       }
       if (this.phase === 'ended') {
         throw new Error('Das Spiel ist bereits beendet.');
+      }
+      if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
+        throw new Error('Bitte zuerst eine Karte ziehen.');
       }
       if (this.needsDiscard()) {
         throw new Error('Bitte zuerst das Handkartenlimit einhalten.');
@@ -281,12 +317,18 @@
         offeredCardIds: cards.map((c) => c.id),
         toPlayerIndex,
       };
-      this._log(`${fromPlayer.name} bietet ${toPlayer.name} ${cards.length} Karte(n) verdeckt zum Tausch an.`);
+      this._log(
+        `${fromPlayer.name} bietet ${toPlayer.name} ${cards.length} Karte(n) verdeckt zum Tausch an und beendet damit seinen Zug. ${toPlayer.name} entscheidet, sobald er/sie an der Reihe ist.`
+      );
+      this._advanceTurn();
     }
 
     declineTrade() {
       if (!this.pendingTrade) {
         throw new Error('Es gibt keinen offenen Tausch.');
+      }
+      if (this.pendingTrade.toPlayerIndex !== this.currentPlayerIndex) {
+        throw new Error('Nur der Zielspieler kann auf diesen Tausch reagieren.');
       }
       const fromPlayer = this.players[this.pendingTrade.fromPlayerIndex];
       const toPlayer = this.players[this.pendingTrade.toPlayerIndex];
@@ -297,6 +339,9 @@
     acceptTradeWithCounter(counterCardIds) {
       if (!this.pendingTrade) {
         throw new Error('Es gibt keinen offenen Tausch.');
+      }
+      if (this.pendingTrade.toPlayerIndex !== this.currentPlayerIndex) {
+        throw new Error('Nur der Zielspieler kann auf diesen Tausch reagieren.');
       }
       const { fromPlayerIndex, offeredCardIds, toPlayerIndex } = this.pendingTrade;
       const fromPlayer = this.players[fromPlayerIndex];
@@ -340,7 +385,12 @@
       if (this.needsDiscard()) {
         throw new Error('Handkartenlimit überschritten – bitte zuerst Karten ablegen.');
       }
+      this._advanceTurn();
+    }
 
+    // Wechselt zum nächsten Spieler - von endTurn() und von proposeTrade()
+    // aufgerufen (ein Tauschangebot beendet den Zug automatisch).
+    _advanceTurn() {
       const wasLastPlayer = this.currentPlayerIndex === this.players.length - 1;
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
       this.hasDrawnThisTurn = false;
@@ -395,10 +445,17 @@
         throw new Error('Es gibt kein offenes Ereignis.');
       }
       const card = this.pendingEvent;
+      // Ein Twist bleibt nur "bis zum nächsten Ereignis" aktiv - unabhängig
+      // davon, ob dieses neue Ereignis selbst wieder einen Twist setzt.
+      const hadModifier = this.activeModifier;
+      this.activeModifier = null;
       try {
         card.effect(this);
       } catch (err) {
         this._log(`Fehler beim Ereigniseffekt: ${err.message}`);
+      }
+      if (hadModifier && !this.activeModifier) {
+        this._log(`${hadModifier.label} ist nicht mehr aktiv.`);
       }
       this.pendingEvent = null;
       this._checkShowdownEnd();

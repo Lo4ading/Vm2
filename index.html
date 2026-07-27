@@ -26,11 +26,12 @@
       <li>Karte ziehen.</li>
       <li>Beliebig viele passende Sets ausspielen – mindestens 2 zusammengehörige Karten, oder eine einzelne Karte, die ein bereits liegendes Set erweitert. Pro Zug gibt es höchstens 1 Bonuskarte, egal wie viele Sets folgen (außer bei Ramsch, siehe unten).</li>
       <li>Optional trödeln: genau 2 Handkarten (auch Ramsch) auf den Friedhof legen und dafür 1 neue Karte ziehen – immer eine Option, auch mit einer nutzlosen Hand.</li>
-      <li>Optional einen Tausch anbieten: Karte(n) auswählen und einem Mitspieler verdeckt anbieten. Der oder die kann ablehnen oder blind Gegenkarte(n) dazulegen – erst dann sehen beide, was sie bekommen haben.</li>
+      <li>Optional statt allem anderen einen Tausch anbieten: Karte(n) auswählen und einem Mitspieler verdeckt anbieten – das beendet sofort den eigenen Zug. Der Zielspieler entscheidet erst, wenn er/sie selbst an der Reihe ist: ablehnen (nichts passiert) oder blind Gegenkarte(n) dazulegen – erst dann sehen beide, was sie bekommen haben. Ein Tausch pro Zug.</li>
       <li>Mehr als 3 Handkarten? Überzählige Karten verdeckt auf den Friedhof ablegen.</li>
       <li>Zug beenden – der nächste Spieler ist an der Reihe.</li>
     </ol>
     <p>Nach jeder vollständigen Runde zieht automatisch der Spieler mit dem niedrigsten Punktestand 1 Karte extra (Nachzügler-Bonus), danach wird eine Ereigniskarte aufgedeckt und muss per Pop-up bestätigt werden, bevor es weitergeht.</p>
+    <p><strong>Twist-Ereignisse:</strong> Manche Ereignisse ändern die Regeln bis zum nächsten Ereignis - z. B. "erst Ramsch abgeben, um zu ziehen" oder "Sets ausspielen nur, wer schon eins gespielt hat". Ein aktiver Twist wird oben im Spielbereich angezeigt.</p>
     <p>Ist der Nachziehstapel leer, beginnt der <strong>Showdown</strong>: es wird nicht mehr gezogen (auch nicht mehr getrödelt), nur noch vorhandene Sets ausgespielt. Kann niemand mehr spielen, endet die Partie.</p>
     <p><strong>Punkte:</strong> Einzelkarte = 1 Punkt · Teilset = Kartenanzahl × Setgröße · vollständiges Set (schon ab der Hälfte der Setgröße!) = verdoppelt.</p>
     <p><strong>Ramsch:</strong> 30% der Fundstücke sind Ramsch. Auch Ramsch lässt sich ab 2 Karten als Set ausspielen, bringt dann aber flach 1 Punkt pro Karte statt der normalen Set-Formel – und keine Bonuskarte. Eine einzelne, nie ausgespielte Ramsch-Karte ist 0 Punkte wert. Da man beim Tausch nie sieht, was man bekommt, kann so auch Ramsch den Besitzer wechseln.</p>
@@ -57,6 +58,8 @@
     </div>
 
     <div class="hint-banner" id="hint-banner"></div>
+    <div class="modifier-banner" id="modifier-banner"></div>
+    <div class="pending-trade-banner" id="pending-trade-banner"></div>
     <div class="secret-goal-badge" id="secret-goal-badge"></div>
 
     <div class="board">
@@ -87,24 +90,24 @@
         <button id="draw-btn" type="button" title="Zieht eine Karte vom Nachziehstapel – der erste Schritt jedes Zugs.">🎴 Karte ziehen</button>
         <button id="play-set-btn" type="button" title="Spielt die ausgewählten Handkarten als (Teil-)Set aus.">🃏 Set ausspielen</button>
         <button id="declutter-btn" type="button" title="Legt genau 2 ausgewählte Handkarten ab und zieht dafür 1 neue Karte.">🔄 Trödeln (2 gegen 1)</button>
-        <button id="trade-btn" type="button" title="Wähle Karten aus deiner Hand und biete sie einem anderen Spieler verdeckt zum Tausch an.">🤝 Tausch anbieten</button>
+        <button id="trade-btn" type="button" title="Wähle Karten aus deiner Hand und biete sie einem anderen Spieler verdeckt zum Tausch an. Beendet sofort deinen Zug.">🤝 Tausch anbieten</button>
         <button id="end-turn-btn" type="button" title="Beendet deinen Zug, sofern das Handkartenlimit eingehalten ist.">✅ Zug beenden</button>
         <button id="new-game-btn" type="button" title="Verwirft die aktuelle Partie und startet neu.">↺ Neue Partie</button>
       </div>
 
       <div class="trade-compose" id="trade-compose">
         <p class="trade-panel-title">🤝 Tauschangebot zusammenstellen <span>– dein Gegenüber sieht die Karten vorher nicht</span></p>
-        <p class="trade-hint">Wähle oben in deiner Hand die Karte(n), die du anbieten möchtest, und ein Ziel:</p>
+        <p class="trade-hint">Wähle oben in deiner Hand die Karte(n), die du anbieten möchtest, und ein Ziel. Das Senden beendet sofort deinen Zug – dein Gegenüber entscheidet, sobald es/er/sie an der Reihe ist.</p>
         <div class="trade-target-row" id="trade-target-options"></div>
         <div class="trade-panel-actions">
-          <button id="trade-send-btn" class="primary" type="button">Angebot senden</button>
+          <button id="trade-send-btn" class="primary" type="button">Angebot senden &amp; Zug beenden</button>
           <button id="trade-compose-cancel-btn" type="button">Abbrechen</button>
         </div>
       </div>
 
       <div class="trade-pending" id="trade-pending">
-        <p class="trade-panel-title">🎁 Tauschangebot <span id="trade-pending-summary"></span></p>
-        <p class="trade-hint">Wähle deine Gegenkarte(n) verdeckt aus oder lehne das Angebot ab.</p>
+        <p class="trade-panel-title">🎁 Tauschangebot wartet auf dich <span id="trade-pending-summary"></span></p>
+        <p class="trade-hint">Wähle deine Gegenkarte(n) verdeckt aus oder lehne das Angebot ab, bevor du deinen Zug fortsetzt.</p>
         <div class="hand-cards" id="trade-response-hand"></div>
         <div class="trade-panel-actions">
           <button id="trade-accept-btn" class="primary" type="button">Tausch bestätigen</button>

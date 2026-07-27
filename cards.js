@@ -493,10 +493,70 @@
         },
       },
       {
-        title: 'Ruhige Runde',
-        description: '☕ Nichts passiert. Der Markt macht heute Pause.',
+        title: 'Ruhiger Handel',
+        description: '🤝 Ruhiger Tag auf dem Markt: Jeder Spieler mit weniger als 3 Handkarten zieht auf.',
         effect: (game) => {
-          game._log('☕ Ruhige Runde: kein Effekt.');
+          for (const player of game.players) {
+            while (player.hand.length < 3 && !game.drawPile.isEmpty) {
+              player.addCards([game.drawPile.draw()]);
+            }
+          }
+          if (game.drawPile.isEmpty) game._enterShowdown();
+          game._log('🤝 Ruhiger Handel: alle Spieler mit weniger als 3 Handkarten ziehen auf.');
+        },
+      },
+      // --- Twist-Ereignisse ---------------------------------------------
+      // Diese vier setzen game.activeModifier statt (nur) sofort zu wirken:
+      // die Regeländerung bleibt aktiv, bis das nächste Ereignis aufgedeckt
+      // wird (siehe acknowledgePendingEvent in rules.js, das activeModifier
+      // vor jedem neuen Effekt zurücksetzt). So dreht jede Runde spürbar an
+      // den Regeln, nicht nur am Kartenbestand.
+      {
+        title: 'Ramsch-Pflicht',
+        description: '🗑️ Standkontrolle! Bis zum nächsten Ereignis muss jeder, der zieht, zuerst eine Ramsch-Karte abgeben (falls vorhanden).',
+        effect: (game) => {
+          game.activeModifier = {
+            id: 'ramsch-pflicht',
+            label: 'Ramsch-Pflicht',
+            description: 'Vor jedem Ziehen muss eine Ramsch-Karte abgegeben werden (falls vorhanden).',
+          };
+          game._log('🗑️ Ramsch-Pflicht ist aktiv, bis das nächste Ereignis aufgedeckt wird.');
+        },
+      },
+      {
+        title: 'Nur für Profis',
+        description: '🎓 Reserviert für Stammkunden! Bis zum nächsten Ereignis dürfen nur Spieler Sets ausspielen, die schon mindestens ein Set gespielt haben.',
+        effect: (game) => {
+          game.activeModifier = {
+            id: 'nur-fuer-profis',
+            label: 'Nur für Profis',
+            description: 'Sets ausspielen geht nur, wer schon mindestens ein Set gespielt hat.',
+          };
+          game._log('🎓 Nur für Profis ist aktiv, bis das nächste Ereignis aufgedeckt wird.');
+        },
+      },
+      {
+        title: 'Ramsch-Boom',
+        description: '📈 Vintage-Trend! Bis zum nächsten Ereignis gibt auch ein ausgespieltes Ramsch-Set eine Bonuskarte.',
+        effect: (game) => {
+          game.activeModifier = {
+            id: 'ramsch-boom',
+            label: 'Ramsch-Boom',
+            description: 'Ramsch-Sets geben vorübergehend auch eine Bonuskarte.',
+          };
+          game._log('📈 Ramsch-Boom ist aktiv, bis das nächste Ereignis aufgedeckt wird.');
+        },
+      },
+      {
+        title: 'Verkaufsstopp',
+        description: '🚫 Der Marktaufseher macht Standkontrolle! Bis zum nächsten Ereignis dürfen keine Sets ausgespielt werden - nur sammeln, trödeln, tauschen.',
+        effect: (game) => {
+          game.activeModifier = {
+            id: 'verkaufsstopp',
+            label: 'Verkaufsstopp',
+            description: 'Sets ausspielen ist verboten, bis das nächste Ereignis kommt.',
+          };
+          game._log('🚫 Verkaufsstopp ist aktiv, bis das nächste Ereignis aufgedeckt wird.');
         },
       },
     ];

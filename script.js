@@ -86,6 +86,8 @@
     confirmDiscardBtn: document.getElementById('confirm-discard-btn'),
 
     hintBanner: document.getElementById('hint-banner'),
+    modifierBanner: document.getElementById('modifier-banner'),
+    pendingTradeBanner: document.getElementById('pending-trade-banner'),
     statusMessage: document.getElementById('status-message'),
     endPanel: document.getElementById('end-panel'),
     finalScores: document.getElementById('final-scores'),
@@ -380,6 +382,26 @@
     el.secretGoalBadge.textContent = `🎯 Kundenwunsch von ${player.name}: ${goalDef.emoji} ${goalDef.name} (${owned}/${goalDef.goal})${met ? ' ✅ erfüllt!' : ''}`;
   }
 
+  function renderModifierBanner() {
+    el.modifierBanner.textContent = game.activeModifier
+      ? `🔥 ${game.activeModifier.label}: ${game.activeModifier.description}`
+      : '';
+  }
+
+  // Zeigt Namen und Kartenzahl eines offenen Tauschs für alle sichtbar an,
+  // solange er NICHT gerade den aktuellen Spieler blockiert (dafür gibt es
+  // schon das eigene Panel) - macht nachvollziehbar, worauf man noch wartet.
+  function renderPendingTradeBanner() {
+    if (!game.pendingTrade || game.pendingTrade.toPlayerIndex === game.currentPlayerIndex) {
+      el.pendingTradeBanner.textContent = '';
+      return;
+    }
+    const fromPlayer = game.players[game.pendingTrade.fromPlayerIndex];
+    const toPlayer = game.players[game.pendingTrade.toPlayerIndex];
+    const count = game.pendingTrade.offeredCardIds.length;
+    el.pendingTradeBanner.textContent = `📬 Offener Tausch: ${fromPlayer.name} → ${toPlayer.name} (${count} Karte(n), wartet bis ${toPlayer.name} an der Reihe ist)`;
+  }
+
   function renderPlayers() {
     el.playersArea.innerHTML = '';
     const activeChanged = game.currentPlayerIndex !== previousActivePlayerIndex;
@@ -413,13 +435,13 @@
     });
   }
 
-  // 'event' (Popup wartet auf OK) hat Vorrang vor 'pending' (game.pendingTrade
-  // wartet auf Reaktion) vor 'composing' (Angebot wird zusammengestellt) vor
-  // 'normal'. Ein Event und ein Tausch können laut rules.js nie gleichzeitig
-  // offen sein, die Reihenfolge ist trotzdem defensiv so gewählt.
+  // 'event' (Popup wartet auf OK) hat Vorrang vor 'pending' vor 'composing'
+  // vor 'normal'. 'pending' greift nur, wenn der AKTUELLE Spieler auch das
+  // Ziel des offenen Tauschs ist - andere Spieler spielen dazwischen ganz
+  // normal weiter, bis der Tausch bei ihrem eigenen Zug ansteht.
   function currentUiState() {
     if (game.pendingEvent) return 'event';
-    if (game.pendingTrade) return 'pending';
+    if (game.pendingTrade && game.pendingTrade.toPlayerIndex === game.currentPlayerIndex) return 'pending';
     if (uiMode === 'composing') return 'composing';
     return 'normal';
   }
@@ -548,11 +570,17 @@
     const ended = game.phase === 'ended';
     const mustDrawFirst = game.phase === 'playing' && !game.hasDrawnThisTurn;
 
+    const modifier = game.activeModifier?.id;
+    const setsForbidden = modifier === 'verkaufsstopp' || (modifier === 'nur-fuer-profis' && game.currentPlayer.collection.getAllCards().length === 0);
+
     el.drawBtn.disabled = blocked || ended || needsDiscard || game.phase !== 'playing' || game.hasDrawnThisTurn;
-    el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || selectedCardIds.size === 0;
+    el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || selectedCardIds.size === 0 || setsForbidden;
     el.declutterBtn.disabled =
       blocked || ended || needsDiscard || mustDrawFirst || game.phase !== 'playing' || selectedCardIds.size !== 2;
-    el.tradeBtn.disabled = blocked || ended || needsDiscard;
+    // Weltweit nur 1 offener Tausch gleichzeitig (siehe rules.js proposeTrade) -
+    // der Button bleibt also auch für unbeteiligte Spieler gesperrt, solange
+    // irgendwo noch einer aussteht.
+    el.tradeBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || Boolean(game.pendingTrade);
     el.endTurnBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst;
 
     el.discardRequired.hidden = !needsDiscard || state !== 'normal';
@@ -671,11 +699,16 @@
       pendingTradeHtml = `<div>${escapeHtml(fromPlayer.name)} → ${escapeHtml(toPlayer.name)}: ${escapeHtml(offeredNames)}</div>`;
     }
 
+    const modifierHtml = game.activeModifier
+      ? `<div>${escapeHtml(game.activeModifier.label)}: ${escapeHtml(game.activeModifier.description)}</div>`
+      : '<div>Kein aktiver Twist.</div>';
+
     el.debugContent.innerHTML = `
       <section><h4>Nachziehstapel (Reihenfolge, oben zuerst)</h4>${drawOrder}</section>
       <section><h4>Alle Spielerhände</h4>${hands}</section>
       <section><h4>Ereigniskarten</h4>${events}</section>
       <section><h4>Mysterio-Karten im Spiel</h4>${allMysterio}</section>
+      <section><h4>Aktiver Twist</h4>${modifierHtml}</section>
       <section><h4>Offener Tausch (normalerweise verdeckt)</h4>${pendingTradeHtml}</section>
       <section><h4>Kundenwünsche (normalerweise privat)</h4>${secretGoals}</section>
       <section><h4>Aktuelle Punkte</h4>${scores}</section>
@@ -697,6 +730,8 @@
     if (!game) return;
     renderStatusBar();
     renderPiles();
+    renderModifierBanner();
+    renderPendingTradeBanner();
     renderSecretGoalBadge();
     renderPlayers();
     renderHand();

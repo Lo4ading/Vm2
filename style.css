@@ -298,6 +298,55 @@ input:focus-visible,
   display: none;
 }
 
+/* Twist-Ereignisse sollen auffallen - warmer Verlauf statt der ruhigen
+   Akzentfarbe, mit einem kurzen Einflug beim ersten Erscheinen. */
+.modifier-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(120deg, var(--warning-soft), var(--mysterio-bg));
+  border: 1px solid var(--warning);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  animation: modifier-in 0.3s ease;
+}
+
+.modifier-banner:empty {
+  display: none;
+}
+
+@keyframes modifier-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modifier-banner {
+    animation: none;
+  }
+}
+
+.pending-trade-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-alt);
+  border: 1px dashed var(--accent);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 5px 12px;
+  margin-bottom: 14px;
+  font-size: 0.82rem;
+}
+
+.pending-trade-banner:empty {
+  display: none;
+}
+
 .piles {
   display: flex;
   gap: 12px;
@@ -641,11 +690,12 @@ input:focus-visible,
 .trade-compose.open,
 .trade-pending.open {
   display: block;
-  margin-top: 10px;
-  padding: 10px 14px;
+  margin-top: 12px;
+  padding: 14px 16px;
   background: var(--accent-soft);
   border: 1px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
   animation: trade-form-in 0.2s ease;
 }
 
@@ -656,7 +706,8 @@ input:focus-visible,
 
 .trade-panel-title {
   margin: 0 0 8px;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.02rem;
 }
 
 .trade-panel-title span {
@@ -666,7 +717,7 @@ input:focus-visible,
 }
 
 .trade-hint {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 0.85rem;
   color: var(--text-muted);
 }
@@ -675,13 +726,22 @@ input:focus-visible,
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.trade-target-row button {
+  border-radius: 999px;
+}
+
+.trade-target-row button::before {
+  content: '👤 ';
 }
 
 .trade-target-row button.selected {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .trade-panel-actions {
