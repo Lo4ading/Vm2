@@ -49,7 +49,6 @@
     handLimit: document.getElementById('hand-limit'),
     handCards: document.getElementById('hand-cards'),
 
-    drawBtn: document.getElementById('draw-btn'),
     playSetBtn: document.getElementById('play-set-btn'),
     binPutBtn: document.getElementById('bin-put-btn'),
     binTakeBtn: document.getElementById('bin-take-btn'),
@@ -114,6 +113,8 @@
 
     el.setupScreen.hidden = true;
     el.gameScreen.hidden = false;
+    autoDrawIfNeeded();
+    flushLogToasts();
     render();
   });
 
@@ -132,8 +133,6 @@
   });
 
   // --- Aktions-Buttons --------------------------------------------------
-  el.drawBtn.addEventListener('click', () => runAction(() => game.drawCard()));
-
   el.playSetBtn.addEventListener('click', () =>
     runAction(() => {
       if (selectedCardIds.size === 0) {
@@ -186,8 +185,27 @@
     } catch (err) {
       el.statusMessage.textContent = err.message;
     }
+    autoDrawIfNeeded();
     flushLogToasts();
     render();
+  }
+
+  // Ziehen ist kein eigener Zugschritt mehr, den man anstoßen muss - man zieht
+  // ohnehin bei jedem Zug automatisch genau 1 Karte. Läuft nach jeder Aktion,
+  // damit es greift, sobald der Zug wirklich beginnt (z. B. direkt nach
+  // Spielstart, nach Zugwechsel oder nachdem ein Ereignis-Popup bestätigt
+  // wurde) - die Zieh-Einflug-Animation (siehe renderHand) bleibt dabei erhalten.
+  function autoDrawIfNeeded() {
+    if (!game) return;
+    if (game.phase === 'playing' && !game.hasDrawnThisTurn && !game.pendingEvent) {
+      try {
+        game.drawCard();
+      } catch {
+        // sollte durch die obige Bedingung nie eintreten - sicherheitshalber
+        // trotzdem abgefangen, damit ein unerwarteter Zustand nicht die
+        // ganze Aktionskette blockiert.
+      }
+    }
   }
 
   // --- Toasts & Konfetti ("coole Effekte") --------------------------------
@@ -364,6 +382,21 @@
     previousHandCardIds = newCardIds;
   }
 
+  // Prüft, ob die aktuelle Auswahl überhaupt ein gültiges (Teil-)Set ergäbe -
+  // dieselbe Logik wie rules.js playSet(), aber ohne Seiteneffekte. Der Button
+  // bleibt so grau, solange die Auswahl kein spielbares Set bildet, statt erst
+  // beim Klick eine Fehlermeldung zu zeigen.
+  function selectionFormsValidSet() {
+    if (selectedCardIds.size === 0) return false;
+    const player = game.currentPlayer;
+    const cards = player.hand.filter((c) => selectedCardIds.has(c.id));
+    if (cards.length !== selectedCardIds.size) return false;
+    const setName = cards[0].setName;
+    if (!cards.every((c) => c.setName === setName)) return false;
+    const existing = player.collection.getGroupSize(setName);
+    return existing + cards.length >= 2;
+  }
+
   // Ermittelt in Klartext, was als Nächstes zu tun ist - hilft Einsteigern,
   // ohne die Spielregeln selbst irgendwo zu duplizieren.
   function computeHint(state) {
@@ -374,9 +407,6 @@
     if (game.needsDiscard()) {
       const overflow = game.currentPlayer.hand.length - HAND_LIMIT;
       return `🗑️ Handkartenlimit überschritten: wähle ${overflow} Karte(n) aus und lege sie ab.`;
-    }
-    if (game.phase === 'playing' && !game.hasDrawnThisTurn) {
-      return '🎴 Ziehe eine Karte, um deinen Zug zu beginnen.';
     }
     if (selectedCardIds.size > 0) {
       return '🃏 Passt die Auswahl? Klicke auf „Set ausspielen“ oder „In Grabbelkiste legen“ (bei genau 1 Karte).';
@@ -398,8 +428,7 @@
     const modifier = game.activeModifier?.id;
     const setsForbidden = modifier === 'verkaufsstopp' || (modifier === 'nur-fuer-profis' && game.currentPlayer.collection.getAllCards().length === 0);
 
-    el.drawBtn.disabled = blocked || ended || needsDiscard || notPlaying || game.hasDrawnThisTurn;
-    el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || selectedCardIds.size === 0 || setsForbidden;
+    el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || setsForbidden || !selectionFormsValidSet();
     el.binPutBtn.disabled =
       blocked || ended || needsDiscard || mustDrawFirst || notPlaying ||
       selectedCardIds.size !== 1 || game.binPutUsedThisTurn || game.bargainBin.length >= BIN_CAPACITY;
@@ -416,10 +445,9 @@
     }
 
     // Hebt die naheliegende nächste Aktion optisch hervor, ohne andere gültige Züge zu sperren.
-    [el.drawBtn, el.playSetBtn, el.endTurnBtn].forEach((btn) => btn.classList.remove('primary'));
+    [el.playSetBtn, el.endTurnBtn].forEach((btn) => btn.classList.remove('primary'));
     if (!ended && state === 'normal') {
-      if (mustDrawFirst && !needsDiscard) el.drawBtn.classList.add('primary');
-      else if (selectedCardIds.size > 0 && !el.playSetBtn.disabled) el.playSetBtn.classList.add('primary');
+      if (!el.playSetBtn.disabled) el.playSetBtn.classList.add('primary');
       else if (!needsDiscard && !el.endTurnBtn.disabled) el.endTurnBtn.classList.add('primary');
     }
 
