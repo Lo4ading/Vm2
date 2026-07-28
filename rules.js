@@ -18,6 +18,7 @@
 
   const HAND_LIMIT = 3;
   const BIN_CAPACITY = 5;
+  const BIN_CAPACITY_BOOSTED = 8;
 
   class Player {
     constructor(id, name) {
@@ -242,14 +243,14 @@
 
     // --- Optionale Zusatzaktion: Grabbelkiste -------------------------------
     // Ein gemeinsamer, verdeckter Stapel in der Tischmitte - der einzige Weg,
-    // wie Karten heute den Besitzer wechseln. Pro Zug ist normalerweise genau
-    // EINE der beiden Richtungen erlaubt (rein ODER raus, nie beides), damit
-    // niemand die Kiste im Alleingang leerräumt oder zumüllt. Kein Zielspieler,
-    // keine Absprache möglich - anders als ein 1:1-Tausch lässt sich das nicht
-    // zur Teamarbeit zwischen zwei Spielern gegen den Rest missbrauchen.
-    // Twist "Ausverkauf am Grabbeltisch" erlaubt vorübergehend beide Richtungen.
+    // wie Karten heute den Besitzer wechseln. Rein und Raus sind unabhängige
+    // Aktionen, je höchstens einmal pro Zug - wer eine schlechte Karte
+    // reinlegt, darf im selben Zug auch eine (andere, unbekannte) herausholen,
+    // statt nur altruistisch zu spenden. Kein Zielspieler, keine Absprache
+    // möglich - anders als ein 1:1-Tausch lässt sich das nicht zur Teamarbeit
+    // zwischen zwei Spielern gegen den Rest missbrauchen.
     _binCapacity() {
-      return BIN_CAPACITY;
+      return this.activeModifier?.id === 'grabbelkiste-ausverkauf' ? BIN_CAPACITY_BOOSTED : BIN_CAPACITY;
     }
 
     putInBin(cardId) {
@@ -277,8 +278,6 @@
       }
       this.bargainBin.push(card);
       this.binPutUsedThisTurn = true;
-      const ausverkauf = this.activeModifier?.id === 'grabbelkiste-ausverkauf';
-      if (!ausverkauf) this.binTakeUsedThisTurn = true;
       this._log(`${player.name} legt 1 Karte verdeckt in die Grabbelkiste.`);
     }
 
@@ -305,8 +304,6 @@
       const [card] = this.bargainBin.splice(index, 1);
       player.addCards([card]);
       this.binTakeUsedThisTurn = true;
-      const ausverkauf = this.activeModifier?.id === 'grabbelkiste-ausverkauf';
-      if (!ausverkauf) this.binPutUsedThisTurn = true;
       // Bewusst nicht loggen, WELCHE Karte es war - das bleibt auch im
       // gemeinsamen Verlauf verdeckt, sonst wäre "blind" nur ein Wort.
       this._log(`${player.name} greift blind in die Grabbelkiste.`);
@@ -317,11 +314,29 @@
       return this.currentPlayer.isOverHandLimit();
     }
 
+    // Handkartenlimit-Überschuss wandert bevorzugt in die Grabbelkiste (bis
+    // zu ihrer Kapazität) statt auf den Friedhof - eine zweite, unfreiwillige
+    // Möglichkeit, schlechte Karten gegen unbekannte einzutauschen, statt sie
+    // ins Nichts zu legen. Ist die Kiste voll, geht der Rest auf den Friedhof.
     discardCards(cardIds) {
       const player = this.currentPlayer;
       const removed = player.removeFromHand(cardIds);
-      this.discardPile.addMany(removed);
-      this._log(`${player.name} legt ${removed.length} Karte(n) auf den Friedhof.`);
+      let intoBin = 0;
+      for (const card of removed) {
+        if (this.bargainBin.length < this._binCapacity()) {
+          this.bargainBin.push(card);
+          intoBin++;
+        } else {
+          this.discardPile.add(card);
+        }
+      }
+      if (intoBin === removed.length) {
+        this._log(`${player.name} legt ${removed.length} Karte(n) in die Grabbelkiste (Handkartenlimit).`);
+      } else if (intoBin === 0) {
+        this._log(`${player.name} legt ${removed.length} Karte(n) auf den Friedhof (Grabbelkiste voll).`);
+      } else {
+        this._log(`${player.name} legt ${intoBin} Karte(n) in die Grabbelkiste, ${removed.length - intoBin} auf den Friedhof (Handkartenlimit).`);
+      }
     }
 
     // --- Zugschritt 6: Zug beenden ----------------------------------------
@@ -348,6 +363,7 @@
 
       if (wasLastPlayer) {
         this.roundNumber++;
+        this._recalculateHandLimits();
         this._revealEventCard(); // deckt nur auf, wendet den Effekt noch nicht an
       }
 
@@ -356,6 +372,26 @@
       // Handkarten verändern, die für die Prüfung relevant sind.
       if (!this.pendingEvent) {
         this._checkShowdownEnd();
+      }
+    }
+
+    // Ausgleich gegen den Bonuskarten-Schneeball: wer bei Rundenwechsel den
+    // niedrigsten Punktestand hat, darf bis zur nächsten Runde 1 Handkarte
+    // mehr halten, ohne sie ablegen zu müssen - keine geschenkte Karte,
+    // sondern mehr Spielraum, ein Teilset zusammenzuhalten. Bei Gleichstand
+    // (z. B. Runde 1, alle bei 0) bekommen alle Betroffenen den Ausgleich.
+    _recalculateHandLimits() {
+      const scores = this.calculateScores();
+      const lowest = Math.min(...scores.map((s) => s.total));
+      for (const s of scores) {
+        const boosted = s.total === lowest;
+        const newLimit = boosted ? HAND_LIMIT + 1 : HAND_LIMIT;
+        if (s.player.handLimit !== newLimit) {
+          s.player.handLimit = newLimit;
+          if (boosted) {
+            this._log(`${s.player.name} darf bis zur nächsten Runde ${newLimit} statt ${HAND_LIMIT} Handkarten halten (niedrigster Punktestand).`);
+          }
+        }
       }
     }
 

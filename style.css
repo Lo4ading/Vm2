@@ -505,6 +505,22 @@ input:focus-visible,
   border-width: 4px;
 }
 
+/* Schlichtes, statisches "das ist selten"-Signal - bewusst kein Glitzern
+   oder Animation, nur ein deutlicher goldener Glanzrand plus Sternchen. */
+.card.rare {
+  box-shadow: 0 0 0 2px #e8b100 inset, 0 3px 10px color-mix(in srgb, #e8b100 35%, transparent);
+}
+
+.card.rare::after {
+  content: '★';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  color: #e8b100;
+  font-size: 0.8rem;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
+
 .card.event {
   background: var(--event-bg);
 }
@@ -796,4 +812,44 @@ input:focus-visible,
   .modal-box {
     animation: none;
   }
+}
+
+/* Kartenübersicht: deutlich breiter als das schmale Ereignis-Popup und mit
+   eigenem Scrollbereich, da hier alle ~55 Kartentypen auf einmal Platz
+   finden müssen. */
+.catalog-modal-box {
+  max-width: 900px;
+  text-align: left;
+}
+
+#catalog-content {
+  max-height: 65vh;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 4px;
+}
+
+.catalog-section {
+  margin-bottom: 18px;
+}
+
+.catalog-section h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.catalog-section h3 span {
+  font-weight: normal;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.catalog-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.catalog-grid .card {
+  cursor: default;
 }

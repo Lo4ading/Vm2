@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const { Game, HAND_LIMIT, BIN_CAPACITY } = window.FlowMarkt;
+  const { Game, createObjectCards, createRamschCards, createMysterioCards, SET_DEFINITIONS } = window.FlowMarkt;
 
   let game = null;
   let selectedCardIds = new Set();
@@ -78,6 +78,11 @@
     eventModalTitle: document.getElementById('event-modal-title'),
     eventModalDescription: document.getElementById('event-modal-description'),
     eventModalOkBtn: document.getElementById('event-modal-ok-btn'),
+
+    catalogBtn: document.getElementById('catalog-btn'),
+    catalogModal: document.getElementById('catalog-modal'),
+    catalogContent: document.getElementById('catalog-content'),
+    catalogCloseBtn: document.getElementById('catalog-close-btn'),
   };
 
   // --- Setup-Bildschirm -----------------------------------------------------
@@ -178,6 +183,24 @@
   // werden, nicht versehentlich weggeklickt werden können.
   el.eventModalOkBtn.addEventListener('click', () => runAction(() => game.acknowledgePendingEvent()));
 
+  // Kartenübersicht: rein informativ, kein Zugzustand betroffen - anders als
+  // das Ereignis-Popup darf sie jederzeit formlos geschlossen werden (Klick
+  // auf den Hintergrund, Escape oder der Schließen-Button).
+  el.catalogBtn.addEventListener('click', () => {
+    el.catalogContent.innerHTML = buildCatalogHtml();
+    el.catalogModal.classList.add('open');
+  });
+  function closeCatalog() {
+    el.catalogModal.classList.remove('open');
+  }
+  el.catalogCloseBtn.addEventListener('click', closeCatalog);
+  el.catalogModal.addEventListener('click', (e) => {
+    if (e.target === el.catalogModal) closeCatalog();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && el.catalogModal.classList.contains('open')) closeCatalog();
+  });
+
   function runAction(fn) {
     try {
       el.statusMessage.textContent = '';
@@ -273,6 +296,7 @@
     const isSetCard = card.type === 'object' || card.type === 'mysterio' || card.type === 'ramsch';
     const tooltip = card.type === 'mysterio' && card.effectText ? card.effectText : card.flavorText;
     if (tooltip) div.title = tooltip;
+    if (card.rarity === 'rare') div.classList.add('rare');
     div.innerHTML = `
       ${isSetCard ? `<div class="card-badge">${card.imagePlaceholder} ×${card.setSize}</div>` : ''}
       <div class="placeholder">${cardPlaceholder(card)}</div>
@@ -305,7 +329,7 @@
   function renderPiles() {
     el.drawPileCount.textContent = String(game.drawPile.size);
     el.discardPileCount.textContent = String(game.discardPile.size);
-    el.binPileCount.textContent = `${game.bargainBin.length}/${BIN_CAPACITY}`;
+    el.binPileCount.textContent = `${game.bargainBin.length}/${game._binCapacity()}`;
     const lastEvent = game.revealedEvents[game.revealedEvents.length - 1];
     el.eventCardDisplay.textContent = lastEvent
       ? `${lastEvent.title}\n${lastEvent.description}`
@@ -362,7 +386,7 @@
     const state = currentUiState();
     const player = game.currentPlayer;
     el.handCount.textContent = String(player.hand.length);
-    el.handLimit.textContent = String(HAND_LIMIT);
+    el.handLimit.textContent = String(player.handLimit);
     el.handCards.innerHTML = '';
     const newCardIds = new Set();
     player.hand.forEach((card) => {
@@ -405,7 +429,7 @@
       return '📣 Ereignis aufgedeckt – im Popup mit „OK“ bestätigen.';
     }
     if (game.needsDiscard()) {
-      const overflow = game.currentPlayer.hand.length - HAND_LIMIT;
+      const overflow = game.currentPlayer.hand.length - game.currentPlayer.handLimit;
       return `🗑️ Handkartenlimit überschritten: wähle ${overflow} Karte(n) aus und lege sie ab.`;
     }
     if (selectedCardIds.size > 0) {
@@ -431,7 +455,7 @@
     el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || setsForbidden || !selectionFormsValidSet();
     el.binPutBtn.disabled =
       blocked || ended || needsDiscard || mustDrawFirst || notPlaying ||
-      selectedCardIds.size !== 1 || game.binPutUsedThisTurn || game.bargainBin.length >= BIN_CAPACITY;
+      selectedCardIds.size !== 1 || game.binPutUsedThisTurn || game.bargainBin.length >= game._binCapacity();
     el.binTakeBtn.disabled =
       blocked || ended || needsDiscard || mustDrawFirst || notPlaying ||
       game.binTakeUsedThisTurn || game.bargainBin.length === 0;
@@ -439,7 +463,7 @@
 
     el.discardRequired.hidden = !needsDiscard || state !== 'normal';
     if (needsDiscard && state === 'normal') {
-      const overflow = game.currentPlayer.hand.length - HAND_LIMIT;
+      const overflow = game.currentPlayer.hand.length - game.currentPlayer.handLimit;
       el.discardNeededCount.textContent = String(overflow);
       el.confirmDiscardBtn.disabled = selectedCardIds.size !== overflow;
     }
@@ -553,6 +577,39 @@
       <section><h4>Grabbelkiste (normalerweise verdeckt)</h4>${binContents}</section>
       <section><h4>Aktuelle Punkte</h4>${scores}</section>
     `;
+  }
+
+  // Kartenübersicht: statischer Katalog aller Kartentypen im Spiel, gebaut
+  // direkt aus den Fabrikfunktionen in cards.js statt Daten zu duplizieren.
+  // Unabhängig vom laufenden Spiel nutzbar (auch schon vor Spielstart), daher
+  // einmalig berechnet und zwischengespeichert - die Daten ändern sich nie.
+  let catalogHtml = null;
+  function buildCatalogHtml() {
+    if (catalogHtml) return catalogHtml;
+    const objectCards = createObjectCards();
+    const ramschCards = createRamschCards();
+    const mysterioCards = createMysterioCards();
+
+    const bySet = new Map();
+    for (const card of objectCards) {
+      if (!bySet.has(card.setName)) bySet.set(card.setName, []);
+      bySet.get(card.setName).push(card);
+    }
+
+    const section = (title, emoji, cards) => {
+      const tiles = cards.map((card) => createCardElement(card, { selectable: false }).outerHTML).join('');
+      return `<section class="catalog-section"><h3>${emoji} ${escapeHtml(title)} <span>(${cards.length})</span></h3><div class="catalog-grid">${tiles}</div></section>`;
+    };
+
+    let html = '';
+    for (const setDef of SET_DEFINITIONS) {
+      html += section(setDef.name, setDef.emoji, bySet.get(setDef.name) || []);
+    }
+    html += section('Ramsch', '🗑️', ramschCards);
+    html += section('Mysterio', '❓', mysterioCards);
+
+    catalogHtml = html;
+    return catalogHtml;
   }
 
   function renderEventModal() {

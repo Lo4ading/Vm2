@@ -14,6 +14,7 @@
       <span class="brand-mark" aria-hidden="true">🛒</span>
       <h1>Flow-Markt <span class="version">V0.1</span></h1>
     </div>
+    <button id="catalog-btn" type="button" title="Zeigt alle Kartentypen im Spiel als Übersicht.">📖 Kartenübersicht</button>
     <label class="debug-toggle">
       <input type="checkbox" id="debug-toggle">
       Debug-Modus
@@ -25,17 +26,18 @@
     <ol>
       <li>Zu Beginn des Zugs wird automatisch 1 Karte gezogen – kein eigener Schritt nötig.</li>
       <li>Beliebig viele passende Sets ausspielen – mindestens 2 zusammengehörige Karten, oder eine einzelne Karte, die ein bereits liegendes Set erweitert. Pro Zug gibt es höchstens 1 Bonuskarte, egal wie viele Sets folgen (außer bei Ramsch, siehe unten).</li>
-      <li>Optional die Grabbelkiste nutzen: entweder genau 1 Handkarte verdeckt hineinlegen ODER blind 1 Karte herausnehmen (nie beides im selben Zug). Das ist der einzige Weg, wie Karten den Besitzer wechseln – ohne Zielspieler, ohne Absprache.</li>
-      <li>Mehr als 3 Handkarten? Überzählige Karten verdeckt auf den Friedhof ablegen.</li>
+      <li>Optional die Grabbelkiste nutzen: bis zu 1 Handkarte verdeckt hineinlegen UND/ODER blind 1 Karte herausnehmen, beides unabhängig voneinander möglich. Das ist der einzige Weg, wie Karten den Besitzer wechseln – ohne Zielspieler, ohne Absprache.</li>
+      <li>Mehr als eure Handkartenlimit? Überzählige Karten wandern in die Grabbelkiste (solange Platz ist) oder auf den Friedhof.</li>
       <li>Zug beenden – der nächste Spieler ist an der Reihe.</li>
     </ol>
     <p>Nach jeder vollständigen Runde wird eine Ereigniskarte aufgedeckt und muss per Pop-up bestätigt werden, bevor es weitergeht.</p>
-    <p><strong>Grabbelkiste:</strong> Fasst höchstens 5 Karten. Ist sie voll, muss erst jemand herausnehmen, bevor wieder etwas hineinpasst. Niemand sieht, was drinliegt oder wer was hineingelegt hat – reines Glück, aber der einzige Weg, um an Karten anderer Spieler zu kommen.</p>
-    <p><strong>Twist-Ereignisse:</strong> Manche Ereignisse ändern die Regeln bis zum nächsten Ereignis - z. B. "erst Ramsch abgeben, um zu ziehen", "Sets ausspielen nur, wer schon eins gespielt hat" oder "heute darf jeder auch rein UND raus aus der Grabbelkiste". Ein aktiver Twist wird oben im Spielbereich angezeigt.</p>
+    <p><strong>Grabbelkiste:</strong> Fasst normalerweise höchstens 5 Karten. Ist sie voll, muss erst jemand herausnehmen, bevor wieder etwas hineinpasst. Niemand sieht, was drinliegt oder wer was hineingelegt hat – reines Glück, aber der einzige Weg, um an Karten anderer Spieler zu kommen. Auch Handkartenlimit-Überschuss landet zuerst hier statt direkt auf dem Friedhof – eine zweite Chance, schlechte Karten gegen unbekannte einzutauschen.</p>
+    <p><strong>Handkartenlimit-Ausgleich:</strong> Nach jeder vollen Runde darf, wer den niedrigsten Punktestand hat, bis zur nächsten Runde 1 Handkarte mehr halten, ohne sie ablegen zu müssen.</p>
+    <p><strong>Twist-Ereignisse:</strong> Manche Ereignisse ändern die Regeln bis zum nächsten Ereignis - z. B. "erst Ramsch abgeben, um zu ziehen", "Sets ausspielen nur, wer schon eins gespielt hat" oder "die Grabbelkiste fasst vorübergehend viel mehr". Ein aktiver Twist wird oben im Spielbereich angezeigt.</p>
     <p>Ist der Nachziehstapel leer, beginnt der <strong>Showdown</strong>: es wird nicht mehr gezogen und die Grabbelkiste ist geschlossen, nur noch vorhandene Sets ausgespielt. Kann niemand mehr spielen, endet die Partie.</p>
     <p><strong>Punkte:</strong> Einzelkarte = 1 Punkt · Teilset = Kartenanzahl × Setgröße · vollständiges Set (schon ab der Hälfte der Setgröße!) = verdoppelt.</p>
     <p><strong>Ramsch:</strong> 30% der Fundstücke sind Ramsch. Auch Ramsch lässt sich ab 2 Karten als Set ausspielen, bringt dann aber flach 1 Punkt pro Karte statt der normalen Set-Formel – und keine Bonuskarte. Eine einzelne, nie ausgespielte Ramsch-Karte ist 0 Punkte wert.</p>
-    <p><strong>Mysterio:</strong> 5 seltene Karten mit echtem Spezialeffekt (Bonuspunkte am Spielende, teils mit einem kleinen Haken beim Ausspielen) – den genauen Effekt zeigt ein Tooltip auf der Karte.</p>
+    <p><strong>Mysterio:</strong> 5 seltene Karten (goldener Glanzrand) mit echtem Spezialeffekt (Bonuspunkte am Spielende, teils mit einem kleinen Haken beim Ausspielen) – den genauen Effekt zeigt ein Tooltip auf der Karte.</p>
   </details>
 
   <section id="setup-screen" class="screen">
@@ -90,8 +92,8 @@
 
       <div class="actions" id="actions">
         <button id="play-set-btn" type="button" title="Spielt die ausgewählten Handkarten als (Teil-)Set aus.">🃏 Set ausspielen</button>
-        <button id="bin-put-btn" type="button" title="Legt genau 1 ausgewählte Handkarte verdeckt in die Grabbelkiste.">📥 In Grabbelkiste legen</button>
-        <button id="bin-take-btn" type="button" title="Nimmt blind 1 Karte aus der Grabbelkiste.">🎲 Blind herausnehmen</button>
+        <button id="bin-put-btn" type="button" title="Legt genau 1 ausgewählte Handkarte verdeckt in die Grabbelkiste. Unabhängig davon einmal pro Zug möglich.">📥 In Grabbelkiste legen</button>
+        <button id="bin-take-btn" type="button" title="Nimmt blind 1 Karte aus der Grabbelkiste. Unabhängig davon einmal pro Zug möglich.">🎲 Blind herausnehmen</button>
         <button id="end-turn-btn" type="button" title="Beendet deinen Zug, sofern das Handkartenlimit eingehalten ist.">✅ Zug beenden</button>
         <button id="new-game-btn" type="button" title="Verwirft die aktuelle Partie und startet neu.">↺ Neue Partie</button>
       </div>
@@ -131,6 +133,15 @@
     <h2 id="event-modal-title"></h2>
     <p id="event-modal-description"></p>
     <button id="event-modal-ok-btn" class="primary" type="button">OK</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="catalog-modal" role="dialog" aria-modal="true" aria-labelledby="catalog-modal-title">
+  <div class="modal-box catalog-modal-box">
+    <p class="modal-eyebrow">📖 Kartenübersicht</p>
+    <h2 id="catalog-modal-title">Alle Kartentypen im Spiel</h2>
+    <div id="catalog-content"></div>
+    <button id="catalog-close-btn" class="primary" type="button">Schließen</button>
   </div>
 </div>
 

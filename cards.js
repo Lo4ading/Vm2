@@ -579,12 +579,12 @@
       },
       {
         title: 'Ausverkauf am Grabbeltisch',
-        description: '📬 Alles muss raus! Bis zum nächsten Ereignis darf jeder Spieler pro Zug einmal rein UND einmal raus aus der Grabbelkiste greifen.',
+        description: '📬 Alles muss raus! Bis zum nächsten Ereignis fasst die Grabbelkiste deutlich mehr Karten als sonst.',
         effect: (game) => {
           game.activeModifier = {
             id: 'grabbelkiste-ausverkauf',
             label: 'Ausverkauf am Grabbeltisch',
-            description: 'Pro Zug ist sowohl Reinlegen als auch Herausnehmen aus der Grabbelkiste erlaubt.',
+            description: 'Die Grabbelkiste fasst vorübergehend deutlich mehr Karten.',
           };
           game._log('📬 Ausverkauf am Grabbeltisch ist aktiv, bis das nächste Ereignis aufgedeckt wird.');
         },
