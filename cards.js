@@ -144,7 +144,7 @@
     }
   }
 
-  // Ablagestapel ("Friedhof"). Karten liegen verdeckt und nehmen an keiner
+  // Ablagestapel ("Sperrmüll"). Karten liegen verdeckt und nehmen an keiner
   // weiteren Wertung mehr teil.
   class DiscardPile {
     constructor() {
@@ -391,7 +391,7 @@
       },
       {
         itemName: 'Wackelige Kristallkugel',
-        effectText: '🔮 +2 Bonuspunkte, verlangt beim Ausspielen aber ein Opfer: deine älteste Handkarte wandert auf den Friedhof.',
+        effectText: '🔮 +2 Bonuspunkte, verlangt beim Ausspielen aber ein Opfer: deine älteste Handkarte wandert auf den Sperrmüll.',
         specialEffect: () => 2,
         drawback: ({ game, player }) => {
           const [card] = player.removeFromHand([player.hand[0]?.id].filter(Boolean));
@@ -463,7 +463,7 @@
       },
       {
         title: 'Große Inventur',
-        description: '🧹 Der Marktaufseher zählt durch! Jeder Spieler muss seine älteste Handkarte auf den Friedhof legen - Ordnung muss sein.',
+        description: '🧹 Der Marktaufseher zählt durch! Jeder Spieler muss seine älteste Handkarte auf den Sperrmüll legen - Ordnung muss sein.',
         effect: (game) => {
           for (const player of game.players) {
             const oldest = player.hand[0];
@@ -477,7 +477,7 @@
       },
       {
         title: 'Preissturz',
-        description: '📉 Ausverkauf, alles muss raus! Die obersten zwei Karten des Nachziehstapels landen sofort auf dem Friedhof.',
+        description: '📉 Ausverkauf, alles muss raus! Die obersten zwei Karten des Nachziehstapels landen sofort auf dem Sperrmüll.',
         effect: (game) => {
           const removed = game.drawPile.drawMany(2);
           game.discardPile.addMany(removed);
@@ -486,15 +486,15 @@
       },
       {
         title: 'Zufallsglück',
-        description: '🍀 Ein Schnäppchen im Ausschuss! Der aktive Spieler darf die oberste Karte des Friedhofs zurückholen.',
+        description: '🍀 Ein Schnäppchen im Ausschuss! Der aktive Spieler darf die oberste Karte des Sperrmülls zurückholen.',
         effect: (game) => {
           const player = game.currentPlayer;
           const card = game.discardPile.cards.pop();
           if (card) {
             player.addCards([card]);
-            game._log(`🍀 Zufallsglück: ${player.name} holt eine Karte aus dem Friedhof zurück.`);
+            game._log(`🍀 Zufallsglück: ${player.name} holt eine Karte aus dem Sperrmüll zurück.`);
           } else {
-            game._log('🍀 Zufallsglück: Friedhof ist leer, kein Effekt.');
+            game._log('🍀 Zufallsglück: Sperrmüll ist leer, kein Effekt.');
           }
         },
       },
@@ -513,7 +513,7 @@
       },
       {
         title: 'Razzia am Flohmarkt',
-        description: '🚨 Das Ordnungsamt greift durch! Die Grabbelkiste wird sofort beschlagnahmt - alles darin wandert auf den Friedhof.',
+        description: '🚨 Das Ordnungsamt greift durch! Die Grabbelkiste wird sofort beschlagnahmt - alles darin wandert auf den Sperrmüll.',
         effect: (game) => {
           const count = game.bargainBin.length;
           if (count > 0) {

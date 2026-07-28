@@ -246,7 +246,7 @@
   // Nicht jede Log-Zeile ist eine Überraschung wert - Routine-Aktionen werden gefiltert.
   function isNoteworthy(entry) {
     if (/ zieht eine Karte\.$/.test(entry)) return false;
-    if (/ legt \d+ Karte\(n\) auf den Friedhof\.$/.test(entry)) return false;
+    if (/ legt \d+ Karte\(n\) auf den Sperrmüll\.$/.test(entry)) return false;
     return true;
   }
 

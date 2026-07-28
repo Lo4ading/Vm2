@@ -315,9 +315,9 @@
     }
 
     // Handkartenlimit-Überschuss wandert bevorzugt in die Grabbelkiste (bis
-    // zu ihrer Kapazität) statt auf den Friedhof - eine zweite, unfreiwillige
+    // zu ihrer Kapazität) statt auf den Sperrmüll - eine zweite, unfreiwillige
     // Möglichkeit, schlechte Karten gegen unbekannte einzutauschen, statt sie
-    // ins Nichts zu legen. Ist die Kiste voll, geht der Rest auf den Friedhof.
+    // ins Nichts zu legen. Ist die Kiste voll, geht der Rest auf den Sperrmüll.
     discardCards(cardIds) {
       const player = this.currentPlayer;
       const removed = player.removeFromHand(cardIds);
@@ -333,9 +333,9 @@
       if (intoBin === removed.length) {
         this._log(`${player.name} legt ${removed.length} Karte(n) in die Grabbelkiste (Handkartenlimit).`);
       } else if (intoBin === 0) {
-        this._log(`${player.name} legt ${removed.length} Karte(n) auf den Friedhof (Grabbelkiste voll).`);
+        this._log(`${player.name} legt ${removed.length} Karte(n) auf den Sperrmüll (Grabbelkiste voll).`);
       } else {
-        this._log(`${player.name} legt ${intoBin} Karte(n) in die Grabbelkiste, ${removed.length - intoBin} auf den Friedhof (Handkartenlimit).`);
+        this._log(`${player.name} legt ${intoBin} Karte(n) in die Grabbelkiste, ${removed.length - intoBin} auf den Sperrmüll (Handkartenlimit).`);
       }
     }
 
