@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const { Game, HAND_LIMIT, SET_DEFINITIONS } = window.FlowMarkt;
+  const { Game, HAND_LIMIT, BIN_CAPACITY, SET_DEFINITIONS } = window.FlowMarkt;
 
   let game = null;
   let selectedCardIds = new Set();
@@ -16,19 +16,11 @@
   let previousHandCardIds = new Set(); // für die Zieh-Einflug-Animation neuer Handkarten
   let previousActivePlayerIndex = -1; // für den Zugwechsel-Puls
 
-  // Tausch-UI-Zustand: 'normal' | 'composing' (Angebot zusammenstellen).
-  // Ein 'pending'-Zustand ergibt sich implizit aus game.pendingTrade und hat
-  // beim Rendern immer Vorrang vor uiMode, siehe currentUiState().
-  let uiMode = 'normal';
-  let tradeOfferSelection = new Set(); // Karten, die gerade als Angebot markiert werden
-  let tradeOfferTargetIndex = null; // Zielspieler-Index für das Angebot
-  let tradeResponseSelection = new Set(); // Gegenkarten beim Reagieren auf ein Angebot
-
   const CONFETTI_EMOJI = ['🎉', '🎊', '✨', '🥳'];
 
-  // Spielernamen und Tauschangebote kommen von Nutzereingaben und landen an
-  // mehreren Stellen in innerHTML-Strings - ungeschützt wäre das eine
-  // HTML-Injection (z. B. brach ein "<" im Tauschtext bisher das Log-Rendering).
+  // Spielernamen landen an mehreren Stellen in innerHTML-Strings - ungeschützt
+  // wäre das eine HTML-Injection (z. B. brach ein "<" im Namen bisher das
+  // Log-Rendering).
   const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
@@ -49,6 +41,7 @@
 
     drawPileCount: document.getElementById('draw-pile-count'),
     discardPileCount: document.getElementById('discard-pile-count'),
+    binPileCount: document.getElementById('bin-pile-count'),
     eventCardDisplay: document.getElementById('event-card-display'),
 
     playersArea: document.getElementById('players-area'),
@@ -58,23 +51,12 @@
 
     drawBtn: document.getElementById('draw-btn'),
     playSetBtn: document.getElementById('play-set-btn'),
-    declutterBtn: document.getElementById('declutter-btn'),
-    tradeBtn: document.getElementById('trade-btn'),
+    binPutBtn: document.getElementById('bin-put-btn'),
+    binTakeBtn: document.getElementById('bin-take-btn'),
     endTurnBtn: document.getElementById('end-turn-btn'),
     newGameBtn: document.getElementById('new-game-btn'),
 
     secretGoalBadge: document.getElementById('secret-goal-badge'),
-
-    tradeCompose: document.getElementById('trade-compose'),
-    tradeTargetOptions: document.getElementById('trade-target-options'),
-    tradeSendBtn: document.getElementById('trade-send-btn'),
-    tradeComposeCancelBtn: document.getElementById('trade-compose-cancel-btn'),
-
-    tradePending: document.getElementById('trade-pending'),
-    tradePendingSummary: document.getElementById('trade-pending-summary'),
-    tradeResponseHand: document.getElementById('trade-response-hand'),
-    tradeAcceptBtn: document.getElementById('trade-accept-btn'),
-    tradeDeclineBtn: document.getElementById('trade-decline-btn'),
 
     handArea: document.querySelector('.hand-area'),
 
@@ -87,7 +69,6 @@
 
     hintBanner: document.getElementById('hint-banner'),
     modifierBanner: document.getElementById('modifier-banner'),
-    pendingTradeBanner: document.getElementById('pending-trade-banner'),
     statusMessage: document.getElementById('status-message'),
     endPanel: document.getElementById('end-panel'),
     finalScores: document.getElementById('final-scores'),
@@ -131,10 +112,6 @@
     celebrationFired = false;
     previousHandCardIds.clear();
     previousActivePlayerIndex = -1;
-    uiMode = 'normal';
-    tradeOfferSelection.clear();
-    tradeOfferTargetIndex = null;
-    tradeResponseSelection.clear();
     window.FlowMarkt.debugGame = game; // Konsolenzugriff für Fehlersuche/Tests
 
     el.setupScreen.hidden = true;
@@ -147,10 +124,6 @@
   el.newGameBtn.addEventListener('click', () => {
     game = null;
     selectedCardIds.clear();
-    uiMode = 'normal';
-    tradeOfferSelection.clear();
-    tradeOfferTargetIndex = null;
-    tradeResponseSelection.clear();
     el.gameScreen.hidden = true;
     el.setupScreen.hidden = false;
   });
@@ -173,65 +146,21 @@
     })
   );
 
-  el.declutterBtn.addEventListener('click', () =>
+  // Grabbelkiste: der einzige Weg, wie Karten heute den Besitzer wechseln.
+  // Kein Zielspieler, keine Absprache möglich - pro Zug normalerweise nur
+  // eine Richtung (rein ODER raus), siehe rules.js putInBin()/takeFromBin().
+  el.binPutBtn.addEventListener('click', () =>
     runAction(() => {
-      if (selectedCardIds.size !== 2) {
-        throw new Error('Bitte genau 2 Karten für den Trödel auswählen.');
+      if (selectedCardIds.size !== 1) {
+        throw new Error('Bitte genau 1 Karte zum Reinlegen auswählen.');
       }
-      game.declutter([...selectedCardIds]);
+      const [cardId] = selectedCardIds;
+      game.putInBin(cardId);
       selectedCardIds.clear();
     })
   );
 
-  // Verdeckter Tausch, kein window.prompt(): der Spieler stellt ein Angebot aus
-  // eigenen Handkarten zusammen, ein Zielspieler nimmt es (blind, Gegenkarten
-  // ausgewählt ohne das Angebot zu sehen) an oder lehnt ab.
-  el.tradeBtn.addEventListener('click', () => {
-    uiMode = 'composing';
-    tradeOfferSelection.clear();
-    const opponents = game.players.map((_, i) => i).filter((i) => i !== game.currentPlayerIndex);
-    tradeOfferTargetIndex = opponents.length === 1 ? opponents[0] : null;
-    render();
-  });
-
-  el.tradeComposeCancelBtn.addEventListener('click', () => {
-    uiMode = 'normal';
-    tradeOfferSelection.clear();
-    tradeOfferTargetIndex = null;
-    render();
-  });
-
-  el.tradeSendBtn.addEventListener('click', () =>
-    runAction(() => {
-      if (tradeOfferSelection.size === 0) {
-        throw new Error('Bitte zuerst Karte(n) für das Angebot auswählen.');
-      }
-      if (tradeOfferTargetIndex === null) {
-        throw new Error('Bitte einen Zielspieler auswählen.');
-      }
-      game.proposeTrade([...tradeOfferSelection], tradeOfferTargetIndex);
-      uiMode = 'normal';
-      tradeOfferSelection.clear();
-      tradeOfferTargetIndex = null;
-    })
-  );
-
-  el.tradeDeclineBtn.addEventListener('click', () =>
-    runAction(() => {
-      game.declineTrade();
-      tradeResponseSelection.clear();
-    })
-  );
-
-  el.tradeAcceptBtn.addEventListener('click', () =>
-    runAction(() => {
-      if (tradeResponseSelection.size === 0) {
-        throw new Error('Bitte zuerst Gegenkarte(n) auswählen.');
-      }
-      game.acceptTradeWithCounter([...tradeResponseSelection]);
-      tradeResponseSelection.clear();
-    })
-  );
+  el.binTakeBtn.addEventListener('click', () => runAction(() => game.takeFromBin()));
 
   el.endTurnBtn.addEventListener('click', () =>
     runAction(() => {
@@ -290,7 +219,8 @@
       if (!isNoteworthy(entry)) continue;
       let variant = 'default';
       if (entry.includes('Ereignis aufgedeckt')) variant = 'event';
-      if (entry.includes('Tausch')) variant = 'trade';
+      if (entry.includes('Grabbelkiste')) variant = 'trade';
+      if (entry.startsWith('💬')) variant = 'flavor';
       if (entry.includes('Showdown beginnt') || entry.includes('das Spiel endet')) variant = 'celebrate';
       showToast(entry, variant);
     }
@@ -325,7 +255,8 @@
     if (card.color) div.style.setProperty('--card-accent', card.color);
     if (selected) div.classList.add('selected');
     const isSetCard = card.type === 'object' || card.type === 'mysterio' || card.type === 'ramsch';
-    if (card.type === 'mysterio' && card.effectText) div.title = card.effectText;
+    const tooltip = card.type === 'mysterio' && card.effectText ? card.effectText : card.flavorText;
+    if (tooltip) div.title = tooltip;
     div.innerHTML = `
       ${isSetCard ? `<div class="card-badge">${card.imagePlaceholder} ×${card.setSize}</div>` : ''}
       <div class="placeholder">${cardPlaceholder(card)}</div>
@@ -358,6 +289,7 @@
   function renderPiles() {
     el.drawPileCount.textContent = String(game.drawPile.size);
     el.discardPileCount.textContent = String(game.discardPile.size);
+    el.binPileCount.textContent = `${game.bargainBin.length}/${BIN_CAPACITY}`;
     const lastEvent = game.revealedEvents[game.revealedEvents.length - 1];
     el.eventCardDisplay.textContent = lastEvent
       ? `${lastEvent.title}\n${lastEvent.description}`
@@ -386,20 +318,6 @@
     el.modifierBanner.textContent = game.activeModifier
       ? `🔥 ${game.activeModifier.label}: ${game.activeModifier.description}`
       : '';
-  }
-
-  // Zeigt Namen und Kartenzahl eines offenen Tauschs für alle sichtbar an,
-  // solange er NICHT gerade den aktuellen Spieler blockiert (dafür gibt es
-  // schon das eigene Panel) - macht nachvollziehbar, worauf man noch wartet.
-  function renderPendingTradeBanner() {
-    if (!game.pendingTrade || game.pendingTrade.toPlayerIndex === game.currentPlayerIndex) {
-      el.pendingTradeBanner.textContent = '';
-      return;
-    }
-    const fromPlayer = game.players[game.pendingTrade.fromPlayerIndex];
-    const toPlayer = game.players[game.pendingTrade.toPlayerIndex];
-    const count = game.pendingTrade.offeredCardIds.length;
-    el.pendingTradeBanner.textContent = `📬 Offener Tausch: ${fromPlayer.name} → ${toPlayer.name} (${count} Karte(n), wartet bis ${toPlayer.name} an der Reihe ist)`;
   }
 
   function renderPlayers() {
@@ -435,41 +353,27 @@
     });
   }
 
-  // 'event' (Popup wartet auf OK) hat Vorrang vor 'pending' vor 'composing'
-  // vor 'normal'. 'pending' greift nur, wenn der AKTUELLE Spieler auch das
-  // Ziel des offenen Tauschs ist - andere Spieler spielen dazwischen ganz
-  // normal weiter, bis der Tausch bei ihrem eigenen Zug ansteht.
+  // Nur noch zwei Zustände: 'event' (Popup wartet auf OK, hat Vorrang) oder
+  // 'normal'. Ohne 1:1-Tausch gibt es keinen dritten, wartenden Zustand mehr.
   function currentUiState() {
     if (game.pendingEvent) return 'event';
-    if (game.pendingTrade && game.pendingTrade.toPlayerIndex === game.currentPlayerIndex) return 'pending';
-    if (uiMode === 'composing') return 'composing';
     return 'normal';
   }
 
   function renderHand() {
     const state = currentUiState();
-    el.handArea.hidden = state === 'pending';
-    if (state === 'pending') {
-      // Trotzdem synchron halten, sonst hält die Karteneinflug-Animation beim
-      // Rückkehren aus dem Tausch-Panel plötzlich die ganze (unveränderte)
-      // Hand für "gerade gezogen".
-      previousHandCardIds = new Set(game.currentPlayer.hand.map((c) => c.id));
-      return; // die Gegenkarten-Auswahl rendert renderTradePanels()
-    }
-
     const player = game.currentPlayer;
-    const activeSelection = state === 'composing' ? tradeOfferSelection : selectedCardIds;
     el.handCount.textContent = String(player.hand.length);
     el.handLimit.textContent = String(HAND_LIMIT);
     el.handCards.innerHTML = '';
     const newCardIds = new Set();
     player.hand.forEach((card) => {
       const cardEl = createCardElement(card, {
-        selectable: true,
-        selected: activeSelection.has(card.id),
+        selectable: state === 'normal',
+        selected: selectedCardIds.has(card.id),
         onClick: (c) => {
-          if (activeSelection.has(c.id)) activeSelection.delete(c.id);
-          else activeSelection.add(c.id);
+          if (selectedCardIds.has(c.id)) selectedCardIds.delete(c.id);
+          else selectedCardIds.add(c.id);
           render();
         },
       });
@@ -480,78 +384,12 @@
     previousHandCardIds = newCardIds;
   }
 
-  function renderTradeTargetOptions() {
-    el.tradeTargetOptions.innerHTML = '';
-    game.players.forEach((player, index) => {
-      if (index === game.currentPlayerIndex) return;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = `${player.name} (${player.hand.length} Karte(n))`;
-      if (index === tradeOfferTargetIndex) btn.classList.add('selected');
-      btn.addEventListener('click', () => {
-        tradeOfferTargetIndex = index;
-        render();
-      });
-      el.tradeTargetOptions.appendChild(btn);
-    });
-  }
-
-  function renderTradeResponseHand() {
-    el.tradeResponseHand.innerHTML = '';
-    if (!game.pendingTrade) return;
-    const responder = game.players[game.pendingTrade.toPlayerIndex];
-    responder.hand.forEach((card) => {
-      const cardEl = createCardElement(card, {
-        selectable: true,
-        selected: tradeResponseSelection.has(card.id),
-        onClick: (c) => {
-          if (tradeResponseSelection.has(c.id)) tradeResponseSelection.delete(c.id);
-          else tradeResponseSelection.add(c.id);
-          render();
-        },
-      });
-      el.tradeResponseHand.appendChild(cardEl);
-    });
-  }
-
-  function renderTradePanels() {
-    const state = currentUiState();
-    el.tradeCompose.classList.toggle('open', state === 'composing');
-    el.tradePending.classList.toggle('open', state === 'pending');
-
-    // Immer aufrufen (nicht nur im 'pending'-Zweig): renderTradeResponseHand()
-    // leert den Container selbst, wenn kein Tausch mehr offen ist - sonst
-    // blieben dort alte, nur per CSS versteckte Kartenelemente im DOM stehen.
-    renderTradeResponseHand();
-
-    if (state === 'composing') {
-      renderTradeTargetOptions();
-      el.tradeSendBtn.disabled = tradeOfferSelection.size === 0 || tradeOfferTargetIndex === null;
-    }
-
-    if (state === 'pending') {
-      const { fromPlayerIndex, offeredCardIds, toPlayerIndex } = game.pendingTrade;
-      const fromPlayer = game.players[fromPlayerIndex];
-      const toPlayer = game.players[toPlayerIndex];
-      el.tradePendingSummary.textContent = `– ${fromPlayer.name} bietet ${toPlayer.name} ${offeredCardIds.length} Karte(n) verdeckt an`;
-      el.tradeAcceptBtn.disabled = tradeResponseSelection.size === 0;
-    }
-  }
-
   // Ermittelt in Klartext, was als Nächstes zu tun ist - hilft Einsteigern,
   // ohne die Spielregeln selbst irgendwo zu duplizieren.
   function computeHint(state) {
     if (game.phase === 'ended') return '🏁 Die Partie ist vorbei – die Endwertung steht unten.';
     if (state === 'event') {
       return '📣 Ereignis aufgedeckt – im Popup mit „OK“ bestätigen.';
-    }
-    if (state === 'pending') {
-      const fromPlayer = game.players[game.pendingTrade.fromPlayerIndex];
-      const toPlayer = game.players[game.pendingTrade.toPlayerIndex];
-      return `🎁 ${toPlayer.name}: Nimmst du das verdeckte Angebot von ${fromPlayer.name} an oder lehnst du ab?`;
-    }
-    if (state === 'composing') {
-      return '🤝 Wähle Handkarte(n) für dein Angebot und ein Ziel, dann sende es ab.';
     }
     if (game.needsDiscard()) {
       const overflow = game.currentPlayer.hand.length - HAND_LIMIT;
@@ -561,32 +399,33 @@
       return '🎴 Ziehe eine Karte, um deinen Zug zu beginnen.';
     }
     if (selectedCardIds.size > 0) {
-      return '🃏 Passt die Auswahl? Klicke auf „Set ausspielen“.';
+      return '🃏 Passt die Auswahl? Klicke auf „Set ausspielen“ oder „In Grabbelkiste legen“ (bei genau 1 Karte).';
     }
     if (game.phase === 'showdown') {
       return '⏳ Showdown: keine neuen Karten mehr – spiele vorhandene Sets aus oder beende deinen Zug.';
     }
-    return '👉 Wähle passende Handkarten für ein Set aus oder beende deinen Zug.';
+    return '👉 Wähle passende Handkarten für ein Set aus, greif in die Grabbelkiste oder beende deinen Zug.';
   }
 
   function renderActions() {
     const state = currentUiState();
-    const blocked = state !== 'normal'; // ein offener Tausch pausiert den normalen Zug
+    const blocked = state !== 'normal';
     const needsDiscard = game.needsDiscard();
     const ended = game.phase === 'ended';
     const mustDrawFirst = game.phase === 'playing' && !game.hasDrawnThisTurn;
+    const notPlaying = game.phase !== 'playing';
 
     const modifier = game.activeModifier?.id;
     const setsForbidden = modifier === 'verkaufsstopp' || (modifier === 'nur-fuer-profis' && game.currentPlayer.collection.getAllCards().length === 0);
 
-    el.drawBtn.disabled = blocked || ended || needsDiscard || game.phase !== 'playing' || game.hasDrawnThisTurn;
+    el.drawBtn.disabled = blocked || ended || needsDiscard || notPlaying || game.hasDrawnThisTurn;
     el.playSetBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || selectedCardIds.size === 0 || setsForbidden;
-    el.declutterBtn.disabled =
-      blocked || ended || needsDiscard || mustDrawFirst || game.phase !== 'playing' || selectedCardIds.size !== 2;
-    // Weltweit nur 1 offener Tausch gleichzeitig (siehe rules.js proposeTrade) -
-    // der Button bleibt also auch für unbeteiligte Spieler gesperrt, solange
-    // irgendwo noch einer aussteht.
-    el.tradeBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst || Boolean(game.pendingTrade);
+    el.binPutBtn.disabled =
+      blocked || ended || needsDiscard || mustDrawFirst || notPlaying ||
+      selectedCardIds.size !== 1 || game.binPutUsedThisTurn || game.bargainBin.length >= BIN_CAPACITY;
+    el.binTakeBtn.disabled =
+      blocked || ended || needsDiscard || mustDrawFirst || notPlaying ||
+      game.binTakeUsedThisTurn || game.bargainBin.length === 0;
     el.endTurnBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst;
 
     el.discardRequired.hidden = !needsDiscard || state !== 'normal';
@@ -629,11 +468,13 @@
         const goalLabel = goalDef
           ? `${goalDef.emoji} ${escapeHtml(goalDef.name)} ${s.secretGoalMet ? '✅ +' + s.secretGoalBonus : '❌'}`
           : '–';
+        const mysterioLabel = s.mysterioBonus > 0 ? `✨ +${s.mysterioBonus}` : '–';
         return `
         <tr class="${winnerIds.has(s.player.id) ? 'winner' : ''}">
           <td>${escapeHtml(s.player.name)}</td>
           <td>${s.setPoints}</td>
           <td>${s.handPoints}</td>
+          <td>${mysterioLabel}</td>
           <td>${goalLabel}</td>
           <td>${s.total}</td>
         </tr>`;
@@ -642,7 +483,7 @@
 
     el.finalScores.innerHTML = `
       <table>
-        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Handkarten</th><th>Kundenwunsch</th><th>Gesamt</th></tr></thead>
+        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Handkarten</th><th>Mysterio</th><th>Kundenwunsch</th><th>Gesamt</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <p><strong>Gewinner:</strong> ${winners.map((w) => escapeHtml(w.player.name)).join(', ')}</p>
@@ -688,7 +529,7 @@
       .calculateScores()
       .map(
         (s) =>
-          `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints}, Kundenwunsch ${s.secretGoalMet ? '✅' : '❌'})</div>`
+          `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints}, Mysterio ${s.mysterioBonus}, Kundenwunsch ${s.secretGoalMet ? '✅' : '❌'})</div>`
       )
       .join('');
 
@@ -696,14 +537,9 @@
       .map((p) => `<div>${escapeHtml(p.name)}: ${escapeHtml(p.secretGoal || '–')}</div>`)
       .join('');
 
-    let pendingTradeHtml = '<div>Kein offener Tausch.</div>';
-    if (game.pendingTrade) {
-      const { fromPlayerIndex, offeredCardIds, toPlayerIndex } = game.pendingTrade;
-      const fromPlayer = game.players[fromPlayerIndex];
-      const toPlayer = game.players[toPlayerIndex];
-      const offeredNames = fromPlayer.hand.filter((c) => offeredCardIds.includes(c.id)).map(cardLabel).join(', ');
-      pendingTradeHtml = `<div>${escapeHtml(fromPlayer.name)} → ${escapeHtml(toPlayer.name)}: ${escapeHtml(offeredNames)}</div>`;
-    }
+    const binContents = game.bargainBin.length
+      ? game.bargainBin.map((c) => escapeHtml(cardLabel(c))).join(', ')
+      : '(leer)';
 
     const modifierHtml = game.activeModifier
       ? `<div>${escapeHtml(game.activeModifier.label)}: ${escapeHtml(game.activeModifier.description)}</div>`
@@ -715,7 +551,7 @@
       <section><h4>Ereigniskarten</h4>${events}</section>
       <section><h4>Mysterio-Karten im Spiel</h4>${allMysterio}</section>
       <section><h4>Aktiver Twist</h4>${modifierHtml}</section>
-      <section><h4>Offener Tausch (normalerweise verdeckt)</h4>${pendingTradeHtml}</section>
+      <section><h4>Grabbelkiste (normalerweise verdeckt)</h4>${binContents}</section>
       <section><h4>Kundenwünsche (normalerweise privat)</h4>${secretGoals}</section>
       <section><h4>Aktuelle Punkte</h4>${scores}</section>
     `;
@@ -742,11 +578,9 @@
     renderStatusBar,
     renderPiles,
     renderModifierBanner,
-    renderPendingTradeBanner,
     renderSecretGoalBadge,
     renderPlayers,
     renderHand,
-    renderTradePanels,
     renderActions,
     renderEndPanel,
     renderLog,

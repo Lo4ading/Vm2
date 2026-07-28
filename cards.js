@@ -22,7 +22,9 @@
     // setGoal = wie viele davon zum "vollständigen Set" (×2-Bonus) reichen -
     // bewusst kleiner als setSize, damit der Bonus erreichbar bleibt. Fällt
     // auf setSize zurück, wenn nicht gesetzt (z. B. bei Mysterio).
-    constructor({ id, name, setName, setSize, setGoal, imagePlaceholder, color, points = 1 }) {
+    // flavorText = kurzer Gag-Spruch, wird beim Ausspielen als Log-Toast
+    // gezeigt - Lesestoff für die wartenden Mitspieler (siehe rules.js playSet).
+    constructor({ id, name, setName, setSize, setGoal, imagePlaceholder, color, points = 1, flavorText = '' }) {
       super(id);
       this.name = name;
       this.setName = setName;
@@ -31,6 +33,7 @@
       this.imagePlaceholder = imagePlaceholder;
       this.color = color || '#495057';
       this.points = points;
+      this.flavorText = flavorText;
     }
 
     get type() {
@@ -88,8 +91,8 @@
   // 1 Punkt pro Karte gewertet (siehe Collection.computeScore) - spielbar,
   // aber klar schwächer als ein echtes Set.
   class RamschCard extends ObjectCard {
-    constructor({ id, name, imagePlaceholder, totalCount }) {
-      super({ id, name, setName: 'Ramsch', setSize: totalCount, imagePlaceholder, color: RAMSCH_COLOR, points: 0 });
+    constructor({ id, name, imagePlaceholder, totalCount, flavorText }) {
+      super({ id, name, setName: 'Ramsch', setSize: totalCount, imagePlaceholder, color: RAMSCH_COLOR, points: 0, flavorText });
     }
 
     get type() {
@@ -243,12 +246,12 @@
       emoji: '📚',
       color: '#8a5a2f',
       items: [
-        'Zerfledderter Liebesroman',
-        'Kochbuch von 1987',
-        'Vinyl: Beste Schlager Vol. 3',
-        'Lexikon, Band 7 von 12',
-        'Reiseführer Mallorca \'98',
-        'Angefangenes Kreuzworträtselheft',
+        { name: 'Zerfledderter Liebesroman', flavor: 'Die letzten drei Seiten fehlen - das Happy End bleibt Verhandlungssache.' },
+        { name: 'Kochbuch von 1987', flavor: 'Jedes Rezept beginnt mit "Man nehme 250g Butter".' },
+        { name: 'Vinyl: Beste Schlager Vol. 3', flavor: 'Vol. 1 und 2 sind für immer verschollen.' },
+        { name: 'Lexikon, Band 7 von 12', flavor: 'Zufällig genau der Band mit dem Stichwort "Flohmarkt".' },
+        { name: 'Reiseführer Mallorca \'98', flavor: 'Der Ballermann hat sich seitdem kaum verändert.' },
+        { name: 'Angefangenes Kreuzworträtselheft', flavor: '7 Buchstaben, "wertloser Kram". Lösung: FLOHMARKT.' },
       ],
     },
     {
@@ -258,13 +261,13 @@
       emoji: '🧸',
       color: '#e8590c',
       items: [
-        'Einarmiger Teddybär',
-        'Zauberwürfel (ungelöst)',
-        'Blechroboter mit Rost',
-        'Puppe mit Augenklappe',
-        'Kaputtes Kaleidoskop',
-        'Holzpferd auf Rädern',
-        'Handheld-Konsole ohne Akku',
+        { name: 'Einarmiger Teddybär', flavor: 'Der andere Arm liegt vermutlich noch unterm Sofa von 1994.' },
+        { name: 'Zauberwürfel (ungelöst)', flavor: 'Der Vorbesitzer hat einfach die Sticker umgeklebt.' },
+        { name: 'Blechroboter mit Rost', flavor: 'Funktioniert nur noch als Türstopper, aber das mit Stil.' },
+        { name: 'Puppe mit Augenklappe', flavor: 'Sieht nachts gruseliger aus als tagsüber.' },
+        { name: 'Kaputtes Kaleidoskop', flavor: 'Zeigt nur noch ein Muster: Enttäuschung.' },
+        { name: 'Holzpferd auf Rädern', flavor: 'Ein Rad quietscht so laut wie ein ganzer Bauernhof.' },
+        { name: 'Handheld-Konsole ohne Akku', flavor: 'Läuft nur noch mit Batterien, die es nicht mehr gibt.' },
       ],
     },
     {
@@ -274,14 +277,14 @@
       emoji: '🍳',
       color: '#2f9e44',
       items: [
-        'Fondue-Set ohne Stecker',
-        'Eieruhr im Hühnerformat',
-        'Emaille-Kanne mit Beule',
-        'Handmixer, Baujahr \'82',
-        'Käseglocke aus Glas',
-        'Suppenteller-Set (3 von 6)',
-        'Toaster mit Eigenleben',
-        'Omas altes Nudelholz',
+        { name: 'Fondue-Set ohne Stecker', flavor: 'Kalter Käse schmeckt trotzdem nach Silvester.' },
+        { name: 'Eieruhr im Hühnerformat', flavor: 'Gackert beim Klingeln - manche behaupten, das sei Absicht.' },
+        { name: 'Emaille-Kanne mit Beule', flavor: 'Die Beule hat Charakter, sagt zumindest der Verkäufer.' },
+        { name: 'Handmixer, Baujahr \'82', flavor: 'Läuft lauter als ein Rasenmäher, rührt aber tapfer weiter.' },
+        { name: 'Käseglocke aus Glas', flavor: 'Schützt seit Jahren erfolgreich: absolut gar nichts.' },
+        { name: 'Suppenteller-Set (3 von 6)', flavor: 'Die anderen drei sind auf Weltreise.' },
+        { name: 'Toaster mit Eigenleben', flavor: 'Wirft Toast manchmal auch ganz ungefragt raus.' },
+        { name: 'Omas altes Nudelholz', flavor: 'Hat schon mehr Teig gesehen als du warme Mahlzeiten.' },
       ],
     },
     {
@@ -291,13 +294,13 @@
       emoji: '🏺',
       color: '#9c36b5',
       items: [
-        'Grinsender Gartenzwerg',
-        'Lavalampe (halb kaputt)',
-        'Getrocknetes Blumenbouquet',
-        'Schneekugel ohne Schnee',
-        'Muschelsammlung im Glas',
-        'Sonnenuntergangs-Bild',
-        'Schiefer Kerzenständer',
+        { name: 'Grinsender Gartenzwerg', flavor: 'Er guckt dich beim Vorbeigehen definitiv an.' },
+        { name: 'Lavalampe (halb kaputt)', flavor: 'Die Lava bewegt sich nur noch, wenn man kräftig schüttelt.' },
+        { name: 'Getrocknetes Blumenbouquet', flavor: 'War 2003 mal frisch, versprochen.' },
+        { name: 'Schneekugel ohne Schnee', flavor: 'Der Schnee ist ausgewandert, die Kugel ist geblieben.' },
+        { name: 'Muschelsammlung im Glas', flavor: 'Riecht noch leicht nach Nordsee, Sommer 2009.' },
+        { name: 'Sonnenuntergangs-Bild', flavor: 'Passt zu jeder Wand, die es nicht besser verdient hat.' },
+        { name: 'Schiefer Kerzenständer', flavor: 'Die Schräglage ist ein Feature, kein Fehler.' },
       ],
     },
     {
@@ -307,44 +310,45 @@
       emoji: '👒',
       color: '#1971c2',
       items: [
-        'Blumenhut mit Mottenloch',
-        'Krawatte mit Ananas-Muster',
-        'Ausgeleierter Ledergürtel',
-        'Einzelner Handschuh',
-        'Second-Hand-Sakko',
-        'Poncho aus den 70ern',
-        'Sonnenbrille mit Sprung',
+        { name: 'Blumenhut mit Mottenloch', flavor: 'Die Motten hatten offensichtlich Geschmack.' },
+        { name: 'Krawatte mit Ananas-Muster', flavor: 'Niemand hat sie je freiwillig getragen.' },
+        { name: 'Ausgeleierter Ledergürtel', flavor: 'Passt inzwischen auf jede Kleidergröße.' },
+        { name: 'Einzelner Handschuh', flavor: 'Der Zweite bleibt eines der großen Menschheitsrätsel.' },
+        { name: 'Second-Hand-Sakko', flavor: 'Riecht nach fremdem Parfüm und alten Geschichten.' },
+        { name: 'Poncho aus den 70ern', flavor: 'Kommt alle 20 Jahre wieder in Mode - Wartezeit läuft.' },
+        { name: 'Sonnenbrille mit Sprung', flavor: 'Der Sprung sorgt für einen ganz eigenen Filtereffekt.' },
       ],
     },
   ]; // Summe = 35 echte Objektkarten (+ 15 Ramsch-Karten = 50)
 
   // 30%-Ramsch-Anteil: eigenständige, wertlose Fundstücke ohne Set-Zugehörigkeit.
   const RAMSCH_ITEMS = [
-    'Einzelne Socke',
-    'Rostiger Nagel',
-    'Leere Streichholzschachtel',
-    'Verblasstes Preisschild',
-    'Kabel ohne Stecker',
-    'Zerrissene Plastiktüte',
-    'Angebrochene Kerze',
-    'Verbogene Büroklammer',
-    'Fleckiger Bierdeckel',
-    'Leere Batterie',
-    'Lose Schraube',
-    'Unlesbare Werbebroschüre',
-    'Kaputter Kugelschreiber',
-    'Verstaubtes Preisschild-Etikett',
-    'Angerissene Serviette',
+    { name: 'Einzelne Socke', flavor: 'Ihr Partner ist im Trockner-Nirwana verschwunden.' },
+    { name: 'Rostiger Nagel', flavor: 'Tetanusgefahr inklusive, Preis trotzdem verhandelbar.' },
+    { name: 'Leere Streichholzschachtel', flavor: 'Perfekt zum Aufbewahren von noch mehr Nichts.' },
+    { name: 'Verblasstes Preisschild', flavor: 'Man kann nur noch erahnen, was es mal kosten sollte.' },
+    { name: 'Kabel ohne Stecker', flavor: 'Passt zu keinem Gerät, das du besitzt.' },
+    { name: 'Zerrissene Plastiktüte', flavor: 'Trägt theoretisch noch, praktisch eher nicht.' },
+    { name: 'Angebrochene Kerze', flavor: 'Hat genau einen Geburtstag überlebt.' },
+    { name: 'Verbogene Büroklammer', flavor: 'Hält nichts mehr zusammen, außer Erinnerungen.' },
+    { name: 'Fleckiger Bierdeckel', flavor: 'Die Ringe erzählen von besseren Abenden.' },
+    { name: 'Leere Batterie', flavor: '0% Ladung - aber immerhin schön leicht.' },
+    { name: 'Lose Schraube', flavor: 'Passt zu niemandem hier - vielleicht ist das die Pointe.' },
+    { name: 'Unlesbare Werbebroschüre', flavor: 'Wirbt für ein Geschäft, das es längst nicht mehr gibt.' },
+    { name: 'Kaputter Kugelschreiber', flavor: 'Schreibt nur noch auf Wunschdenken.' },
+    { name: 'Verstaubtes Preisschild-Etikett', flavor: 'Klebt an nichts mehr, klebt aber trotzdem irgendwie.' },
+    { name: 'Angerissene Serviette', flavor: 'Einmal benutzt, für immer verewigt.' },
   ];
 
   function createRamschCards() {
-    return RAMSCH_ITEMS.map((itemName, index) => {
+    return RAMSCH_ITEMS.map((item, index) => {
       const idNum = String(index + 1).padStart(2, '0');
       return new RamschCard({
         id: `ram-${idNum}`,
-        name: itemName,
+        name: item.name,
         imagePlaceholder: '🗑️',
         totalCount: RAMSCH_ITEMS.length,
+        flavorText: item.flavor,
       });
     });
   }
@@ -353,17 +357,18 @@
     const cards = [];
     let counter = 1;
     for (const set of SET_DEFINITIONS) {
-      set.items.forEach((itemName) => {
+      set.items.forEach((item) => {
         const idNum = String(counter).padStart(2, '0');
         cards.push(
           new ObjectCard({
             id: `obj-${idNum}`,
-            name: itemName,
+            name: item.name,
             setName: set.name,
             setSize: set.size,
             setGoal: set.goal,
             imagePlaceholder: set.emoji,
             color: set.color,
+            flavorText: item.flavor,
           })
         );
         counter++;
@@ -373,48 +378,47 @@
   }
 
   // 5 Mysterio-Karten bilden zugleich ihr eigenes seltenes Set ("Mysterio") -
-  // mysteriöse Flohmarkt-Legenden, denen man einen Spezialeffekt nachsagt.
-  // effectText beschreibt diesen Effekt bereits als Platzhalter in der UI;
-  // specialEffect/drawback sind vorbereitet, aber laut Vorgabe für V0.1
-  // absichtlich noch nicht verdrahtet (siehe Kommentar an MysterioCard).
+  // mysteriöse Flohmarkt-Legenden mit echtem Spezialeffekt. effectText
+  // beschreibt ihn fürs UI (Tooltip/Log); specialEffect() fließt live in die
+  // Wertung ein, drawback() feuert einmalig beim Ausspielen (siehe rules.js).
   function mysterioEffectDefinitions() {
     return [
       {
         itemName: 'Spiegel mit Eigenwillen',
-        effectText: '✨ Effekt (geplant): +3 Bonuspunkte am Spielende.',
+        effectText: '✨ +3 Bonuspunkte am Spielende - er verzerrt nur dein Spiegelbild, nicht deine Punktzahl.',
         specialEffect: () => 3,
-        drawback: ({ game, player }) => game._log(`${player.name} zahlt den Preis des Spiegels mit Eigenwillen (kein Effekt in V0.1).`),
+        drawback: ({ game, player }) => game._log(`${player.name} hängt den Spiegel mit Eigenwillen auf - der Rest ist Verhandlungssache mit dem eigenen Spiegelbild.`),
       },
       {
         itemName: 'Wackelige Kristallkugel',
-        effectText: '✨ Effekt (geplant): +2 Bonuspunkte, kostet aber eine zufällige Handkarte.',
+        effectText: '🔮 +2 Bonuspunkte, verlangt beim Ausspielen aber ein Opfer: deine älteste Handkarte wandert auf den Friedhof.',
         specialEffect: () => 2,
         drawback: ({ game, player }) => {
           const [card] = player.removeFromHand([player.hand[0]?.id].filter(Boolean));
           if (card) game.discardPile.add(card);
-          game._log(`${player.name} legt durch die wacklige Kristallkugel eine Handkarte ab.`);
+          game._log(`${player.name} befragt die wacklige Kristallkugel - sie verlangt eine Handkarte als Opfer.`);
         },
       },
       {
         itemName: 'Anhalter-Amulett',
-        effectText: '✨ Effekt (geplant): +4 Bonuspunkte, ganz ohne Haken.',
+        effectText: '🧿 +4 Bonuspunkte, völlig bedingungslos - das einzig ehrliche Angebot auf dem ganzen Markt.',
         specialEffect: () => 4,
-        drawback: () => {},
+        drawback: ({ game, player }) => game._log(`${player.name} steckt sich das Anhalter-Amulett an - kein Haken, ausnahmsweise.`),
       },
       {
         itemName: 'Verbogene Wünschelrute',
-        effectText: '✨ Effekt (geplant): Bonus richtet sich nach der Anzahl deiner Handkarten.',
+        effectText: '🪄 Bonus = Anzahl deiner Handkarten bei Spielende - wer hortet, gewinnt hier richtig.',
         specialEffect: ({ player }) => player.hand.length,
-        drawback: ({ game, player }) => game._log(`${player.name} riskiert mit der verbogenen Wünschelrute einen unsicheren Bonus.`),
+        drawback: ({ game, player }) => game._log(`${player.name} schwingt die verbogene Wünschelrute - der Ausschlag hängt von der vollen Hand ab.`),
       },
       {
         itemName: 'Truhe mit Eigenleben',
-        effectText: '✨ Effekt (geplant): +5 Bonuspunkte, entfernt aber eine Karte vom Nachziehstapel.',
+        effectText: '🎁 +5 Bonuspunkte, verschluckt beim Ausspielen aber die oberste Karte des Nachziehstapels.',
         specialEffect: () => 5,
-        drawback: ({ game }) => {
+        drawback: ({ game, player }) => {
           const extra = game.drawPile.draw();
           if (extra) game.discardPile.add(extra);
-          game._log('Die Truhe mit Eigenleben entfernt eine Karte vom Nachziehstapel.');
+          game._log(`${player.name} öffnet die Truhe mit Eigenleben - sie schnappt sich dafür eine Karte vom Nachziehstapel.`);
         },
       },
     ];
@@ -438,12 +442,14 @@
     });
   }
 
-  // 10 Ereigniskarten, 5 Effekt-Typen im Wechsel.
+  // 12 Ereigniskarten, im Wechsel aus 11 Effekt-Vorlagen - jede Vorlage soll
+  // spürbar humorvoll den bisherigen Spielstand oder Spielspaß auf den Kopf
+  // stellen, nicht nur nüchtern Karten verschieben.
   function eventEffectTemplates() {
     return [
       {
         title: 'Bonuszug',
-        description: '📦 Lieferengpass behoben! Der aktive Spieler zieht sofort eine zusätzliche Karte.',
+        description: '📦 Lieferung falsch einsortiert! Der aktive Spieler darf sich sofort eine zusätzliche Karte aus der Kiste fischen.',
         effect: (game) => {
           const player = game.currentPlayer;
           const card = game.drawPile.draw();
@@ -456,8 +462,8 @@
         },
       },
       {
-        title: 'Kollektive Ablage',
-        description: '🧹 Inventur! Jeder Spieler legt seine älteste Handkarte auf den Friedhof.',
+        title: 'Große Inventur',
+        description: '🧹 Der Marktaufseher zählt durch! Jeder Spieler muss seine älteste Handkarte auf den Friedhof legen - Ordnung muss sein.',
         effect: (game) => {
           for (const player of game.players) {
             const oldest = player.hand[0];
@@ -466,21 +472,21 @@
               game.discardPile.add(oldest);
             }
           }
-          game._log('🧹 Kollektive Ablage: alle Spieler legen ihre älteste Handkarte ab.');
+          game._log('🧹 Große Inventur: alle Spieler legen ihre älteste Handkarte ab.');
         },
       },
       {
-        title: 'Marktschwankung',
-        description: '📉 Die Preise crashen! Die obersten zwei Karten des Nachziehstapels wandern auf den Friedhof.',
+        title: 'Preissturz',
+        description: '📉 Ausverkauf, alles muss raus! Die obersten zwei Karten des Nachziehstapels landen sofort auf dem Friedhof.',
         effect: (game) => {
           const removed = game.drawPile.drawMany(2);
           game.discardPile.addMany(removed);
-          game._log(`📉 Marktschwankung: ${removed.length} Karte(n) vom Nachziehstapel abgelegt.`);
+          game._log(`📉 Preissturz: ${removed.length} Karte(n) vom Nachziehstapel abgelegt.`);
         },
       },
       {
         title: 'Zufallsglück',
-        description: '🍀 Ein Schnäppchen im Ausschuss! Der aktive Spieler nimmt die oberste Karte des Friedhofs auf die Hand.',
+        description: '🍀 Ein Schnäppchen im Ausschuss! Der aktive Spieler darf die oberste Karte des Friedhofs zurückholen.',
         effect: (game) => {
           const player = game.currentPlayer;
           const card = game.discardPile.cards.pop();
@@ -493,8 +499,8 @@
         },
       },
       {
-        title: 'Ruhiger Handel',
-        description: '🤝 Ruhiger Tag auf dem Markt: Jeder Spieler mit weniger als 3 Handkarten zieht auf.',
+        title: 'Laufkundschaft',
+        description: '🚶 Es strömt Laufkundschaft rein! Jeder Spieler mit weniger als 3 Handkarten zieht auf.',
         effect: (game) => {
           for (const player of game.players) {
             while (player.hand.length < 3 && !game.drawPile.isEmpty) {
@@ -502,15 +508,27 @@
             }
           }
           if (game.drawPile.isEmpty) game._enterShowdown();
-          game._log('🤝 Ruhiger Handel: alle Spieler mit weniger als 3 Handkarten ziehen auf.');
+          game._log('🚶 Laufkundschaft: alle Spieler mit weniger als 3 Handkarten ziehen auf.');
+        },
+      },
+      {
+        title: 'Razzia am Flohmarkt',
+        description: '🚨 Das Ordnungsamt greift durch! Die Grabbelkiste wird sofort beschlagnahmt - alles darin wandert auf den Friedhof.',
+        effect: (game) => {
+          const count = game.bargainBin.length;
+          if (count > 0) {
+            game.discardPile.addMany(game.bargainBin);
+            game.bargainBin = [];
+          }
+          game._log(`🚨 Razzia am Flohmarkt: ${count} Karte(n) aus der Grabbelkiste beschlagnahmt.`);
         },
       },
       // --- Twist-Ereignisse ---------------------------------------------
-      // Diese vier setzen game.activeModifier statt (nur) sofort zu wirken:
-      // die Regeländerung bleibt aktiv, bis das nächste Ereignis aufgedeckt
-      // wird (siehe acknowledgePendingEvent in rules.js, das activeModifier
-      // vor jedem neuen Effekt zurücksetzt). So dreht jede Runde spürbar an
-      // den Regeln, nicht nur am Kartenbestand.
+      // Diese setzen game.activeModifier statt (nur) sofort zu wirken: die
+      // Regeländerung bleibt aktiv, bis das nächste Ereignis aufgedeckt wird
+      // (siehe acknowledgePendingEvent in rules.js, das activeModifier vor
+      // jedem neuen Effekt zurücksetzt). So dreht jede Runde spürbar an den
+      // Regeln, nicht nur am Kartenbestand.
       {
         title: 'Ramsch-Pflicht',
         description: '🗑️ Standkontrolle! Bis zum nächsten Ereignis muss jeder, der zieht, zuerst eine Ramsch-Karte abgeben (falls vorhanden).',
@@ -549,7 +567,7 @@
       },
       {
         title: 'Verkaufsstopp',
-        description: '🚫 Der Marktaufseher macht Standkontrolle! Bis zum nächsten Ereignis dürfen keine Sets ausgespielt werden - nur sammeln, trödeln, tauschen.',
+        description: '🚫 Der Marktaufseher macht Standkontrolle! Bis zum nächsten Ereignis dürfen keine Sets ausgespielt werden - nur sammeln und die Grabbelkiste nutzen.',
         effect: (game) => {
           game.activeModifier = {
             id: 'verkaufsstopp',
@@ -559,13 +577,27 @@
           game._log('🚫 Verkaufsstopp ist aktiv, bis das nächste Ereignis aufgedeckt wird.');
         },
       },
+      {
+        title: 'Ausverkauf am Grabbeltisch',
+        description: '📬 Alles muss raus! Bis zum nächsten Ereignis darf jeder Spieler pro Zug einmal rein UND einmal raus aus der Grabbelkiste greifen.',
+        effect: (game) => {
+          game.activeModifier = {
+            id: 'grabbelkiste-ausverkauf',
+            label: 'Ausverkauf am Grabbeltisch',
+            description: 'Pro Zug ist sowohl Reinlegen als auch Herausnehmen aus der Grabbelkiste erlaubt.',
+          };
+          game._log('📬 Ausverkauf am Grabbeltisch ist aktiv, bis das nächste Ereignis aufgedeckt wird.');
+        },
+      },
     ];
   }
+
+  const EVENT_CARD_COUNT = 12;
 
   function createEventCards() {
     const templates = eventEffectTemplates();
     const cards = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < EVENT_CARD_COUNT; i++) {
       const template = templates[i % templates.length];
       const idNum = String(i + 1).padStart(2, '0');
       cards.push(

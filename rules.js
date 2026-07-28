@@ -18,6 +18,7 @@
   } = FlowMarkt;
 
   const HAND_LIMIT = 3;
+  const BIN_CAPACITY = 5;
   const SECRET_GOAL_BONUS = 15;
   const SET_GOALS = Object.fromEntries(SET_DEFINITIONS.map((s) => [s.name, s.goal]));
 
@@ -67,9 +68,14 @@
       this.log = [];
       this._playerCount = playerCount;
       this._playerNames = playerNames;
-      // { fromPlayerIndex, offeredCardIds, toPlayerIndex } while ein Tausch auf
-      // eine Reaktion wartet; blockiert währenddessen alle anderen Zugaktionen.
-      this.pendingTrade = null;
+      // Grabbelkiste: gemeinsamer, verdeckter Stapel in der Tischmitte - der
+      // einzige Weg, wie Karten heute zwischen Spielern die Seite wechseln.
+      // Bewusst nicht 1:1/zielgerichtet: niemand kann sich mit einem anderen
+      // Spieler gezielt absprechen ("Teamarbeit"), da man nie weiß, wer eine
+      // hineingelegte Karte am Ende herausnimmt.
+      this.bargainBin = [];
+      this.binPutUsedThisTurn = false;
+      this.binTakeUsedThisTurn = false;
       // Die aufgedeckte EventCard, solange ihr Effekt noch nicht bestätigt
       // wurde (siehe acknowledgePendingEvent) - blockiert ebenfalls den Zug,
       // damit das Popup in der UI erzwungen werden kann.
@@ -103,7 +109,9 @@
       this.roundNumber = 1;
       this.hasDrawnThisTurn = false;
       this.bonusDrawGrantedThisTurn = false;
-      this.pendingTrade = null;
+      this.bargainBin = [];
+      this.binPutUsedThisTurn = false;
+      this.binTakeUsedThisTurn = false;
       this.pendingEvent = null;
       this.activeModifier = null;
       this.log = [];
@@ -128,16 +136,11 @@
       return this.players[this.currentPlayerIndex];
     }
 
-    // Ein noch nicht bestätigtes Ereignis pausiert immer den ganzen Zug (das
-    // Popup ist global). Ein offener Tausch pausiert nur, wenn der aktuelle
-    // Spieler auch der Zielspieler ist - alle anderen spielen normal weiter,
-    // bis der Tausch bei ihrem eigenen Zug ansteht (siehe proposeTrade).
+    // Ein noch nicht bestätigtes Ereignis pausiert immer den ganzen Zug - das
+    // Popup ist global und muss aktiv mit "OK" bestätigt werden.
     _assertNoPendingInterrupt() {
       if (this.pendingEvent) {
         throw new Error('Bitte zuerst das Ereignis bestätigen.');
-      }
-      if (this.pendingTrade && this.pendingTrade.toPlayerIndex === this.currentPlayerIndex) {
-        throw new Error('Bitte zuerst den offenen Tausch klären.');
       }
     }
 
@@ -210,9 +213,25 @@
       player.collection.addCards(cards);
       this._log(`${player.name} spielt ${cards.length} Karte(n) im Set "${setName}" aus.`);
 
-      // Mysterio-Karten haben schon einen (Platzhalter-)Effekttext in der UI,
-      // ihre specialEffect/drawback-Funktionen werden für V0.1 aber bewusst
-      // noch nicht ausgelöst - das Verdrahten folgt in einer späteren Version.
+      // Gag-Spruch als Lesestoff für die Mitspieler, während der aktive
+      // Spieler dran ist - landet automatisch im Verlauf/Toast (script.js).
+      for (const card of cards) {
+        if (card.flavorText) this._log(`💬 "${card.flavorText}"`);
+      }
+
+      // Mysterio: drawback() feuert einmalig direkt beim Ausspielen (kann
+      // Seiteneffekte haben); specialEffect() liefert den Punktebonus erst
+      // live in calculateScores(), da er z. B. von der Handkartenzahl bei
+      // Spielende abhängen kann (siehe "Verbogene Wünschelrute").
+      for (const card of cards) {
+        if (card.type === 'mysterio' && typeof card.drawback === 'function') {
+          try {
+            card.drawback({ game: this, player });
+          } catch (err) {
+            this._log(`Fehler beim Mysterio-Effekt: ${err.message}`);
+          }
+        }
+      }
 
       // Ramsch ist spielbar (siehe Collection.computeScore für die flache
       // Wertung), gibt aber bewusst keine Bonuskarte - das bleibt echten
@@ -233,140 +252,76 @@
       }
     }
 
-    // --- Optionale Zusatzaktion: Trödeln -----------------------------------
-    // Legt genau 2 Handkarten (beliebiger Art, auch Ramsch) auf den Friedhof
-    // und zieht dafür 1 neue Karte - gibt Spielern mit einer wertlosen Hand
-    // immer eine sinnvolle Handlung, statt nur zu ziehen und wieder abzulegen.
-    // Wie ein Set zählt das als Zugaktion und ist im Showdown nicht möglich
-    // (dort wird grundsätzlich nicht mehr gezogen).
-    declutter(cardIds) {
-      this._assertNoPendingInterrupt();
-      if (this.phase !== 'playing') {
-        throw new Error('Trödeln ist im Showdown nicht mehr möglich, es wird nicht mehr gezogen.');
-      }
-      if (!this.hasDrawnThisTurn) {
-        throw new Error('Bitte zuerst eine Karte ziehen.');
-      }
-      if (cardIds.length !== 2) {
-        throw new Error('Bitte genau 2 Karten für den Trödel auswählen.');
-      }
-
-      const player = this.currentPlayer;
-      const idSet = new Set(cardIds);
-      const cards = player.hand.filter((c) => idSet.has(c.id));
-      if (cards.length !== 2) {
-        throw new Error('Ungültige Kartenauswahl.');
-      }
-
-      player.removeFromHand(cardIds);
-      this.discardPile.addMany(cards);
-      this._log(`${player.name} trödelt 2 Karte(n) gegen 1 neue.`);
-
-      if (this.drawPile.isEmpty) {
-        this._enterShowdown();
-        return;
-      }
-      const card = this.drawPile.draw();
-      player.addCards([card]);
-      if (this.drawPile.isEmpty) this._enterShowdown();
+    // --- Optionale Zusatzaktion: Grabbelkiste -------------------------------
+    // Ein gemeinsamer, verdeckter Stapel in der Tischmitte - der einzige Weg,
+    // wie Karten heute den Besitzer wechseln. Pro Zug ist normalerweise genau
+    // EINE der beiden Richtungen erlaubt (rein ODER raus, nie beides), damit
+    // niemand die Kiste im Alleingang leerräumt oder zumüllt. Kein Zielspieler,
+    // keine Absprache möglich - anders als ein 1:1-Tausch lässt sich das nicht
+    // zur Teamarbeit zwischen zwei Spielern gegen den Rest missbrauchen.
+    // Twist "Ausverkauf am Grabbeltisch" erlaubt vorübergehend beide Richtungen.
+    _binCapacity() {
+      return BIN_CAPACITY;
     }
 
-    // --- Zugschritt 4: Tausch anbieten -------------------------------------
-    // Verdeckter Tausch: Der Zielspieler sieht die angebotenen Karten nicht,
-    // bevor er reagiert - er kann nur die Anzahl kennen. Damit ist ein Tausch
-    // reines Glücksspiel und Ramsch-Karten lassen sich unbemerkt loswerden.
-    //
-    // Ein Angebot ist die einzige Aktion des Zugs: es beendet den Zug sofort
-    // (ein Spieler tauscht also höchstens einmal pro Zug an). Die angebotenen
-    // Karten bleiben bis zur Reaktion in der Hand des Anbietenden - "gesperrt"
-    // sind sie nicht, aber niemand kann in der Zwischenzeit an den Tausch
-    // heran, weil nur der Zielspieler reagieren darf (siehe declineTrade/
-    // acceptTradeWithCounter) und der erst wieder an der Reihe sein muss.
-    // Andere Spieler spielen bis dahin ganz normal weiter.
-    proposeTrade(offeredCardIds, toPlayerIndex) {
+    putInBin(cardId) {
       this._assertNoPendingInterrupt();
-      if (this.pendingTrade) {
-        throw new Error('Es gibt bereits einen offenen Tausch.');
+      if (this.phase !== 'playing') {
+        throw new Error('Die Grabbelkiste ist im Showdown geschlossen.');
       }
-      if (this.phase === 'ended') {
-        throw new Error('Das Spiel ist bereits beendet.');
-      }
-      if (this.phase === 'playing' && !this.hasDrawnThisTurn) {
+      if (!this.hasDrawnThisTurn) {
         throw new Error('Bitte zuerst eine Karte ziehen.');
       }
       if (this.needsDiscard()) {
         throw new Error('Bitte zuerst das Handkartenlimit einhalten.');
       }
-      if (!Number.isInteger(toPlayerIndex) || toPlayerIndex < 0 || toPlayerIndex >= this.players.length) {
-        throw new Error('Ungültiger Zielspieler.');
+      if (this.binPutUsedThisTurn) {
+        throw new Error('In diesem Zug wurde schon etwas in die Grabbelkiste gelegt.');
       }
-      if (toPlayerIndex === this.currentPlayerIndex) {
-        throw new Error('Du kannst nicht mit dir selbst tauschen.');
-      }
-
-      const fromPlayer = this.currentPlayer;
-      const idSet = new Set(offeredCardIds);
-      const cards = fromPlayer.hand.filter((c) => idSet.has(c.id));
-      if (cards.length !== offeredCardIds.length || cards.length === 0) {
-        throw new Error('Bitte mindestens eine Karte für den Tausch auswählen.');
+      if (this.bargainBin.length >= this._binCapacity()) {
+        throw new Error('Die Grabbelkiste ist voll - erst muss jemand herausnehmen.');
       }
 
-      const toPlayer = this.players[toPlayerIndex];
-      this.pendingTrade = {
-        fromPlayerIndex: this.currentPlayerIndex,
-        offeredCardIds: cards.map((c) => c.id),
-        toPlayerIndex,
-      };
-      this._log(
-        `${fromPlayer.name} bietet ${toPlayer.name} ${cards.length} Karte(n) verdeckt zum Tausch an und beendet damit seinen Zug. ${toPlayer.name} entscheidet, sobald er/sie an der Reihe ist.`
-      );
-      this._advanceTurn();
+      const player = this.currentPlayer;
+      const [card] = player.removeFromHand([cardId]);
+      if (!card) {
+        throw new Error('Ungültige Kartenauswahl.');
+      }
+      this.bargainBin.push(card);
+      this.binPutUsedThisTurn = true;
+      const ausverkauf = this.activeModifier?.id === 'grabbelkiste-ausverkauf';
+      if (!ausverkauf) this.binTakeUsedThisTurn = true;
+      this._log(`${player.name} legt 1 Karte verdeckt in die Grabbelkiste.`);
     }
 
-    declineTrade() {
-      if (!this.pendingTrade) {
-        throw new Error('Es gibt keinen offenen Tausch.');
+    takeFromBin() {
+      this._assertNoPendingInterrupt();
+      if (this.phase !== 'playing') {
+        throw new Error('Die Grabbelkiste ist im Showdown geschlossen.');
       }
-      if (this.pendingTrade.toPlayerIndex !== this.currentPlayerIndex) {
-        throw new Error('Nur der Zielspieler kann auf diesen Tausch reagieren.');
+      if (!this.hasDrawnThisTurn) {
+        throw new Error('Bitte zuerst eine Karte ziehen.');
       }
-      const fromPlayer = this.players[this.pendingTrade.fromPlayerIndex];
-      const toPlayer = this.players[this.pendingTrade.toPlayerIndex];
-      this._log(`${toPlayer.name} lehnt den Tausch von ${fromPlayer.name} ab.`);
-      this.pendingTrade = null;
-      this._checkShowdownEnd();
-    }
-
-    acceptTradeWithCounter(counterCardIds) {
-      if (!this.pendingTrade) {
-        throw new Error('Es gibt keinen offenen Tausch.');
+      if (this.needsDiscard()) {
+        throw new Error('Bitte zuerst das Handkartenlimit einhalten.');
       }
-      if (this.pendingTrade.toPlayerIndex !== this.currentPlayerIndex) {
-        throw new Error('Nur der Zielspieler kann auf diesen Tausch reagieren.');
+      if (this.binTakeUsedThisTurn) {
+        throw new Error('In diesem Zug wurde schon aus der Grabbelkiste genommen.');
       }
-      const { fromPlayerIndex, offeredCardIds, toPlayerIndex } = this.pendingTrade;
-      const fromPlayer = this.players[fromPlayerIndex];
-      const toPlayer = this.players[toPlayerIndex];
-
-      const idSet = new Set(counterCardIds);
-      const counterCards = toPlayer.hand.filter((c) => idSet.has(c.id));
-      if (counterCards.length !== counterCardIds.length || counterCards.length === 0) {
-        throw new Error('Bitte mindestens eine Gegenkarte auswählen.');
+      if (this.bargainBin.length === 0) {
+        throw new Error('Die Grabbelkiste ist leer.');
       }
 
-      const offeredCards = fromPlayer.removeFromHand(offeredCardIds);
-      const givenBack = toPlayer.removeFromHand(counterCards.map((c) => c.id));
-      toPlayer.addCards(offeredCards);
-      fromPlayer.addCards(givenBack);
-      this._log(
-        `${fromPlayer.name} und ${toPlayer.name} tauschen ${offeredCards.length} gegen ${givenBack.length} Karte(n) - erst jetzt sehen beide, was sie bekommen haben.`
-      );
-      this.pendingTrade = null;
-      // Ein akzeptierter Tausch verändert Handkarten und kann daher im
-      // Showdown darüber entscheiden, ob überhaupt noch jemand spielen kann -
-      // anders als bei declineTrade() (dort ändert sich nichts) ist die
-      // Prüfung hier kein Nullop.
-      this._checkShowdownEnd();
+      const player = this.currentPlayer;
+      const index = Math.floor(Math.random() * this.bargainBin.length);
+      const [card] = this.bargainBin.splice(index, 1);
+      player.addCards([card]);
+      this.binTakeUsedThisTurn = true;
+      const ausverkauf = this.activeModifier?.id === 'grabbelkiste-ausverkauf';
+      if (!ausverkauf) this.binPutUsedThisTurn = true;
+      // Bewusst nicht loggen, WELCHE Karte es war - das bleibt auch im
+      // gemeinsamen Verlauf verdeckt, sonst wäre "blind" nur ein Wort.
+      this._log(`${player.name} greift blind in die Grabbelkiste.`);
     }
 
     // --- Zugschritt 5: Handkartenlimit -----------------------------------
@@ -394,13 +349,14 @@
       this._advanceTurn();
     }
 
-    // Wechselt zum nächsten Spieler - von endTurn() und von proposeTrade()
-    // aufgerufen (ein Tauschangebot beendet den Zug automatisch).
+    // Wechselt zum nächsten Spieler.
     _advanceTurn() {
       const wasLastPlayer = this.currentPlayerIndex === this.players.length - 1;
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
       this.hasDrawnThisTurn = false;
       this.bonusDrawGrantedThisTurn = false;
+      this.binPutUsedThisTurn = false;
+      this.binTakeUsedThisTurn = false;
 
       if (wasLastPlayer) {
         this.roundNumber++;
@@ -503,9 +459,10 @@
     }
 
     // --- Wertung -----------------------------------------------------------
-    // Mysterio-Karten zählen hier wie normale Objektkarten über ihr Set
-    // "Mysterio" mit - ihr specialEffect-Bonus ist für V0.1 bewusst noch
-    // nicht verdrahtet (siehe MysterioCard-Kommentar in cards.js).
+    // Mysterio-Karten zählen über ihr Set "Mysterio" wie gewöhnliche
+    // Objektkarten in computeScore() mit, plus ihren eigenen specialEffect-
+    // Bonus obendrauf - live berechnet, da er z. B. von der aktuellen
+    // Handkartenzahl abhängen kann ("Verbogene Wünschelrute").
     calculateScores() {
       return this.players.map((player) => {
         const { total, breakdown } = player.collection.computeScore();
@@ -513,6 +470,18 @@
         const goal = SET_GOALS[player.secretGoal];
         const secretGoalMet = Boolean(goal) && player.collection.getGroupSize(player.secretGoal) >= goal;
         const secretGoalBonus = secretGoalMet ? SECRET_GOAL_BONUS : 0;
+        const mysterioCards = player.collection.getGroups().get('Mysterio') || [];
+        let mysterioBonus = 0;
+        for (const card of mysterioCards) {
+          if (typeof card.specialEffect === 'function') {
+            try {
+              mysterioBonus += card.specialEffect({ game: this, player }) || 0;
+            } catch {
+              // specialEffect muss reine Berechnung sein - ein Fehler hier
+              // fließt einfach mit 0 Bonus für diese Karte in die Wertung ein.
+            }
+          }
+        }
         return {
           player,
           setPoints: total,
@@ -520,7 +489,8 @@
           handPoints,
           secretGoalMet,
           secretGoalBonus,
-          total: total + handPoints + secretGoalBonus,
+          mysterioBonus,
+          total: total + handPoints + secretGoalBonus + mysterioBonus,
         };
       });
     }
@@ -532,5 +502,5 @@
     }
   }
 
-  Object.assign(FlowMarkt, { Player, Game, HAND_LIMIT });
+  Object.assign(FlowMarkt, { Player, Game, HAND_LIMIT, BIN_CAPACITY });
 })(window);
