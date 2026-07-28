@@ -283,21 +283,6 @@ input:focus-visible,
   display: none;
 }
 
-.secret-goal-badge {
-  display: inline-block;
-  background: var(--mysterio-bg);
-  border: 1px dashed var(--warning);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 12px;
-  margin-bottom: 14px;
-  font-size: 0.85rem;
-}
-
-.secret-goal-badge:empty {
-  display: none;
-}
-
 /* Twist-Ereignisse sollen auffallen - warmer Verlauf statt der ruhigen
    Akzentfarbe, mit einem kurzen Einflug beim ersten Erscheinen. */
 .modifier-banner {

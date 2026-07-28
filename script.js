@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const { Game, HAND_LIMIT, BIN_CAPACITY, SET_DEFINITIONS } = window.FlowMarkt;
+  const { Game, HAND_LIMIT, BIN_CAPACITY } = window.FlowMarkt;
 
   let game = null;
   let selectedCardIds = new Set();
@@ -55,8 +55,6 @@
     binTakeBtn: document.getElementById('bin-take-btn'),
     endTurnBtn: document.getElementById('end-turn-btn'),
     newGameBtn: document.getElementById('new-game-btn'),
-
-    secretGoalBadge: document.getElementById('secret-goal-badge'),
 
     handArea: document.querySelector('.hand-area'),
 
@@ -296,24 +294,6 @@
       : 'Noch keine aufgedeckt';
   }
 
-  // Der Kundenwunsch ist privat: nur während des eigenen Zugs sichtbar, nicht
-  // im gemeinsamen Spielerbereich für alle - erst die Endwertung deckt alles auf.
-  function renderSecretGoalBadge() {
-    if (game.phase === 'ended') {
-      el.secretGoalBadge.textContent = '';
-      return;
-    }
-    const player = game.currentPlayer;
-    const goalDef = SET_DEFINITIONS.find((s) => s.name === player.secretGoal);
-    if (!goalDef) {
-      el.secretGoalBadge.textContent = '';
-      return;
-    }
-    const owned = player.collection.getGroupSize(player.secretGoal);
-    const met = owned >= goalDef.goal;
-    el.secretGoalBadge.textContent = `🎯 Kundenwunsch von ${player.name}: ${goalDef.emoji} ${goalDef.name} (${owned}/${goalDef.goal})${met ? ' ✅ erfüllt!' : ''}`;
-  }
-
   function renderModifierBanner() {
     el.modifierBanner.textContent = game.activeModifier
       ? `🔥 ${game.activeModifier.label}: ${game.activeModifier.description}`
@@ -464,10 +444,6 @@
       .slice()
       .sort((a, b) => b.total - a.total)
       .map((s) => {
-        const goalDef = SET_DEFINITIONS.find((g) => g.name === s.player.secretGoal);
-        const goalLabel = goalDef
-          ? `${goalDef.emoji} ${escapeHtml(goalDef.name)} ${s.secretGoalMet ? '✅ +' + s.secretGoalBonus : '❌'}`
-          : '–';
         const mysterioLabel = s.mysterioBonus > 0 ? `✨ +${s.mysterioBonus}` : '–';
         return `
         <tr class="${winnerIds.has(s.player.id) ? 'winner' : ''}">
@@ -475,7 +451,6 @@
           <td>${s.setPoints}</td>
           <td>${s.handPoints}</td>
           <td>${mysterioLabel}</td>
-          <td>${goalLabel}</td>
           <td>${s.total}</td>
         </tr>`;
       })
@@ -483,7 +458,7 @@
 
     el.finalScores.innerHTML = `
       <table>
-        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Handkarten</th><th>Mysterio</th><th>Kundenwunsch</th><th>Gesamt</th></tr></thead>
+        <thead><tr><th>Spieler</th><th>Set-Punkte</th><th>Handkarten</th><th>Mysterio</th><th>Gesamt</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <p><strong>Gewinner:</strong> ${winners.map((w) => escapeHtml(w.player.name)).join(', ')}</p>
@@ -529,12 +504,8 @@
       .calculateScores()
       .map(
         (s) =>
-          `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints}, Mysterio ${s.mysterioBonus}, Kundenwunsch ${s.secretGoalMet ? '✅' : '❌'})</div>`
+          `<div>${escapeHtml(s.player.name)}: ${s.total} Punkte (Sets ${s.setPoints}, Hand ${s.handPoints}, Mysterio ${s.mysterioBonus})</div>`
       )
-      .join('');
-
-    const secretGoals = game.players
-      .map((p) => `<div>${escapeHtml(p.name)}: ${escapeHtml(p.secretGoal || '–')}</div>`)
       .join('');
 
     const binContents = game.bargainBin.length
@@ -552,7 +523,6 @@
       <section><h4>Mysterio-Karten im Spiel</h4>${allMysterio}</section>
       <section><h4>Aktiver Twist</h4>${modifierHtml}</section>
       <section><h4>Grabbelkiste (normalerweise verdeckt)</h4>${binContents}</section>
-      <section><h4>Kundenwünsche (normalerweise privat)</h4>${secretGoals}</section>
       <section><h4>Aktuelle Punkte</h4>${scores}</section>
     `;
   }
@@ -578,7 +548,6 @@
     renderStatusBar,
     renderPiles,
     renderModifierBanner,
-    renderSecretGoalBadge,
     renderPlayers,
     renderHand,
     renderActions,

@@ -14,13 +14,10 @@
     createMysterioCards,
     createRamschCards,
     createEventCards,
-    SET_DEFINITIONS,
   } = FlowMarkt;
 
   const HAND_LIMIT = 3;
   const BIN_CAPACITY = 5;
-  const SECRET_GOAL_BONUS = 15;
-  const SET_GOALS = Object.fromEntries(SET_DEFINITIONS.map((s) => [s.name, s.goal]));
 
   class Player {
     constructor(id, name) {
@@ -29,9 +26,6 @@
       this.hand = [];
       this.collection = new Collection();
       this.handLimit = HAND_LIMIT;
-      // Privates Sammelziel ("Kundenwunsch"), von Game.setup() zugewiesen -
-      // nur der jeweilige Spieler bekommt es während der Partie angezeigt.
-      this.secretGoal = null;
     }
 
     addCards(cards) {
@@ -116,15 +110,9 @@
       this.activeModifier = null;
       this.log = [];
 
-      // Kundenwunsch: jeder Spieler bekommt eine zufällige, private
-      // Zielkategorie (per Deck-Shuffle für dieselbe geprüfte Zufallslogik
-      // wie beim Kartenmischen). Bei mehr Spielern als Kategorien wiederholt
-      // sich die Liste einfach.
-      const shuffledGoals = new Deck(SET_DEFINITIONS.map((s) => s.name)).shuffle().cards;
-      this.players.forEach((player, i) => {
+      this.players.forEach((player) => {
         player.hand = [];
         player.collection = new Collection();
-        player.secretGoal = shuffledGoals[i % shuffledGoals.length];
         player.addCards(this.drawPile.drawMany(2));
       });
 
@@ -360,7 +348,6 @@
 
       if (wasLastPlayer) {
         this.roundNumber++;
-        this._grantCatchUpBonus();
         this._revealEventCard(); // deckt nur auf, wendet den Effekt noch nicht an
       }
 
@@ -369,27 +356,6 @@
       // Handkarten verändern, die für die Prüfung relevant sind.
       if (!this.pendingEvent) {
         this._checkShowdownEnd();
-      }
-    }
-
-    // Nachzügler-Bonus: wer bei Rundenwechsel den niedrigsten Punktestand hat,
-    // zieht 1 Karte extra (still, ohne Popup) - dämpft den Bonuskarten-
-    // Schneeball etwas, indem der Rückstand nicht nur größer werden kann.
-    // Bei einem Gleichstand (z. B. Runde 1, alle bei 0) bekommen alle
-    // Betroffenen die Karte, was sich gegenseitig neutralisiert.
-    _grantCatchUpBonus() {
-      if (this.phase !== 'playing' || this.drawPile.isEmpty) return;
-      const scores = this.calculateScores();
-      const lowest = Math.min(...scores.map((s) => s.total));
-      const trailingPlayers = scores.filter((s) => s.total === lowest).map((s) => s.player);
-      for (const player of trailingPlayers) {
-        if (this.drawPile.isEmpty) {
-          this._enterShowdown();
-          break;
-        }
-        const card = this.drawPile.draw();
-        player.addCards([card]);
-        this._log(`🐢 Nachzügler-Bonus: ${player.name} zieht 1 Karte extra (niedrigster Punktestand).`);
       }
     }
 
@@ -467,9 +433,6 @@
       return this.players.map((player) => {
         const { total, breakdown } = player.collection.computeScore();
         const handPoints = player.hand.reduce((sum, c) => sum + (c.points || 0), 0);
-        const goal = SET_GOALS[player.secretGoal];
-        const secretGoalMet = Boolean(goal) && player.collection.getGroupSize(player.secretGoal) >= goal;
-        const secretGoalBonus = secretGoalMet ? SECRET_GOAL_BONUS : 0;
         const mysterioCards = player.collection.getGroups().get('Mysterio') || [];
         let mysterioBonus = 0;
         for (const card of mysterioCards) {
@@ -487,10 +450,8 @@
           setPoints: total,
           breakdown,
           handPoints,
-          secretGoalMet,
-          secretGoalBonus,
           mysterioBonus,
-          total: total + handPoints + secretGoalBonus + mysterioBonus,
+          total: total + handPoints + mysterioBonus,
         };
       });
     }
