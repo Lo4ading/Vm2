@@ -102,7 +102,7 @@
   el.playerCountInput.addEventListener('input', renderNameInputs);
 
   el.startGameBtn.addEventListener('click', () => {
-    const count = Math.max(2, Math.min(6, Number(el.playerCountInput.value) || 3));
+    const count = Math.max(2, Math.min(4, Number(el.playerCountInput.value) || 3));
     const names = [...el.playerNameInputs.querySelectorAll('input')]
       .map((input) => input.value.trim());
 
