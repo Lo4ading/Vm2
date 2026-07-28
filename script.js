@@ -367,9 +367,12 @@
         })
         .join('') || '<em>keine Sets</em>';
 
+      const catchUpBadge = player.bonusBinTake
+        ? '<span class="catchup-badge" title="Wenigste ausgespielte Karten: darf diese Runde zweimal pro Zug in die Grabbelkiste greifen">🎁 Aufholjagd</span>'
+        : '';
       box.innerHTML = `
         <h4>${escapeHtml(player.name)}<span>${player.hand.length} Karte(n)</span></h4>
-        <div class="groups">${groupsHtml}</div>
+        <div class="groups">${groupsHtml}${catchUpBadge}</div>
       `;
       el.playersArea.appendChild(box);
     });
@@ -456,9 +459,10 @@
     el.binPutBtn.disabled =
       blocked || ended || needsDiscard || mustDrawFirst || notPlaying ||
       selectedCardIds.size !== 1 || game.binPutUsedThisTurn || game.bargainBin.length >= game._binCapacity();
+    const allowedTakes = game.currentPlayer.bonusBinTake ? 2 : 1;
     el.binTakeBtn.disabled =
       blocked || ended || needsDiscard || mustDrawFirst || notPlaying ||
-      game.binTakeUsedThisTurn || game.bargainBin.length === 0;
+      game.binTakesThisTurn >= allowedTakes || game.bargainBin.length === 0;
     el.endTurnBtn.disabled = blocked || ended || needsDiscard || mustDrawFirst;
 
     el.discardRequired.hidden = !needsDiscard || state !== 'normal';

@@ -27,6 +27,11 @@
       this.hand = [];
       this.collection = new Collection();
       this.handLimit = HAND_LIMIT;
+      // Ausgleich gegen den Bonuskarten-Schneeball: wer die wenigsten Karten
+      // ausgespielt hat, bekommt bis zur nächsten Neuberechnung einen
+      // zusätzlich erlaubten Griff in die Grabbelkiste (siehe
+      // Game._recalculateCatchUp / takeFromBin).
+      this.bonusBinTake = false;
     }
 
     addCards(cards) {
@@ -70,7 +75,7 @@
       // hineingelegte Karte am Ende herausnimmt.
       this.bargainBin = [];
       this.binPutUsedThisTurn = false;
-      this.binTakeUsedThisTurn = false;
+      this.binTakesThisTurn = 0;
       // Die aufgedeckte EventCard, solange ihr Effekt noch nicht bestätigt
       // wurde (siehe acknowledgePendingEvent) - blockiert ebenfalls den Zug,
       // damit das Popup in der UI erzwungen werden kann.
@@ -106,7 +111,7 @@
       this.bonusDrawGrantedThisTurn = false;
       this.bargainBin = [];
       this.binPutUsedThisTurn = false;
-      this.binTakeUsedThisTurn = false;
+      this.binTakesThisTurn = 0;
       this.pendingEvent = null;
       this.activeModifier = null;
       this.log = [];
@@ -292,18 +297,21 @@
       if (this.needsDiscard()) {
         throw new Error('Bitte zuerst das Handkartenlimit einhalten.');
       }
-      if (this.binTakeUsedThisTurn) {
+      const player = this.currentPlayer;
+      // Wer die wenigsten Karten ausgespielt hat, darf ein zweites Mal pro
+      // Zug greifen (siehe _recalculateCatchUp) - alle anderen nur einmal.
+      const allowed = player.bonusBinTake ? 2 : 1;
+      if (this.binTakesThisTurn >= allowed) {
         throw new Error('In diesem Zug wurde schon aus der Grabbelkiste genommen.');
       }
       if (this.bargainBin.length === 0) {
         throw new Error('Die Grabbelkiste ist leer.');
       }
 
-      const player = this.currentPlayer;
       const index = Math.floor(Math.random() * this.bargainBin.length);
       const [card] = this.bargainBin.splice(index, 1);
       player.addCards([card]);
-      this.binTakeUsedThisTurn = true;
+      this.binTakesThisTurn++;
       // Bewusst nicht loggen, WELCHE Karte es war - das bleibt auch im
       // gemeinsamen Verlauf verdeckt, sonst wäre "blind" nur ein Wort.
       this._log(`${player.name} greift blind in die Grabbelkiste.`);
@@ -359,11 +367,11 @@
       this.hasDrawnThisTurn = false;
       this.bonusDrawGrantedThisTurn = false;
       this.binPutUsedThisTurn = false;
-      this.binTakeUsedThisTurn = false;
+      this.binTakesThisTurn = 0;
 
       if (wasLastPlayer) {
         this.roundNumber++;
-        this._recalculateHandLimits();
+        this._recalculateCatchUp();
         this._revealEventCard(); // deckt nur auf, wendet den Effekt noch nicht an
       }
 
@@ -375,24 +383,22 @@
       }
     }
 
-    // Ausgleich gegen den Bonuskarten-Schneeball: wer bei Rundenwechsel den
-    // niedrigsten Punktestand hat, darf bis zur nächsten Runde 1 Handkarte
-    // mehr halten, ohne sie ablegen zu müssen - keine geschenkte Karte,
-    // sondern mehr Spielraum, ein Teilset zusammenzuhalten. Bei Gleichstand
-    // (z. B. Runde 1, alle bei 0) bekommen alle Betroffenen den Ausgleich.
-    _recalculateHandLimits() {
-      const scores = this.calculateScores();
-      const lowest = Math.min(...scores.map((s) => s.total));
-      for (const s of scores) {
-        const boosted = s.total === lowest;
-        const newLimit = boosted ? HAND_LIMIT + 1 : HAND_LIMIT;
-        if (s.player.handLimit !== newLimit) {
-          s.player.handLimit = newLimit;
-          if (boosted) {
-            this._log(`${s.player.name} darf bis zur nächsten Runde ${newLimit} statt ${HAND_LIMIT} Handkarten halten (niedrigster Punktestand).`);
-          }
+    // Ausgleich gegen den Bonuskarten-Schneeball: wer bei Rundenwechsel die
+    // wenigsten Karten ausgespielt hat, darf bis zur nächsten Neuberechnung
+    // pro Zug zweimal statt einmal in die Grabbelkiste greifen (siehe
+    // takeFromBin) - eine einzige, direkte Stellschraube statt mehrerer.
+    // Bei Gleichstand (z. B. Runde 1, alle bei 0 gespielten Karten)
+    // bekommen alle Betroffenen den Ausgleich.
+    _recalculateCatchUp() {
+      const playedCounts = this.players.map((p) => p.collection.getAllCards().length);
+      const fewest = Math.min(...playedCounts);
+      this.players.forEach((player, i) => {
+        const boosted = playedCounts[i] === fewest;
+        if (boosted && !player.bonusBinTake) {
+          this._log(`${player.name} darf bis zur nächsten Runde zweimal pro Zug in die Grabbelkiste greifen (wenigste ausgespielte Karten).`);
         }
-      }
+        player.bonusBinTake = boosted;
+      });
     }
 
     _revealEventCard() {
