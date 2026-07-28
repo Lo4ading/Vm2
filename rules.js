@@ -334,6 +334,7 @@
       const toPlayer = this.players[this.pendingTrade.toPlayerIndex];
       this._log(`${toPlayer.name} lehnt den Tausch von ${fromPlayer.name} ab.`);
       this.pendingTrade = null;
+      this._checkShowdownEnd();
     }
 
     acceptTradeWithCounter(counterCardIds) {
@@ -361,6 +362,11 @@
         `${fromPlayer.name} und ${toPlayer.name} tauschen ${offeredCards.length} gegen ${givenBack.length} Karte(n) - erst jetzt sehen beide, was sie bekommen haben.`
       );
       this.pendingTrade = null;
+      // Ein akzeptierter Tausch verändert Handkarten und kann daher im
+      // Showdown darüber entscheiden, ob überhaupt noch jemand spielen kann -
+      // anders als bei declineTrade() (dort ändert sich nichts) ist die
+      // Prüfung hier kein Nullop.
+      this._checkShowdownEnd();
     }
 
     // --- Zugschritt 5: Handkartenlimit -----------------------------------

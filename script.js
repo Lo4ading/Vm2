@@ -449,7 +449,13 @@
   function renderHand() {
     const state = currentUiState();
     el.handArea.hidden = state === 'pending';
-    if (state === 'pending') return; // die Gegenkarten-Auswahl rendert renderTradePanels()
+    if (state === 'pending') {
+      // Trotzdem synchron halten, sonst hält die Karteneinflug-Animation beim
+      // Rückkehren aus dem Tausch-Panel plötzlich die ganze (unveränderte)
+      // Hand für "gerade gezogen".
+      previousHandCardIds = new Set(game.currentPlayer.hand.map((c) => c.id));
+      return; // die Gegenkarten-Auswahl rendert renderTradePanels()
+    }
 
     const player = game.currentPlayer;
     const activeSelection = state === 'composing' ? tradeOfferSelection : selectedCardIds;
@@ -726,21 +732,40 @@
     }
   }
 
+  // Jeder Renderschritt läuft einzeln abgesichert: wirft einer eine Ausnahme
+  // (z. B. ein unerwarteter Datenzustand), dürfen die folgenden Schritte -
+  // allen voran renderActions(), das die Buttons wieder freischaltet -
+  // trotzdem noch laufen. Ohne dieses Netz bliebe die Seite nach einem
+  // einzigen fehlerhaften Renderschritt mit eingefrorenen Buttons stehen,
+  // ohne dass ersichtlich wäre, warum nichts mehr reagiert.
+  const RENDER_STEPS = [
+    renderStatusBar,
+    renderPiles,
+    renderModifierBanner,
+    renderPendingTradeBanner,
+    renderSecretGoalBadge,
+    renderPlayers,
+    renderHand,
+    renderTradePanels,
+    renderActions,
+    renderEndPanel,
+    renderLog,
+    renderDebugPanel,
+    renderEventModal,
+  ];
+
   function render() {
     if (!game) return;
-    renderStatusBar();
-    renderPiles();
-    renderModifierBanner();
-    renderPendingTradeBanner();
-    renderSecretGoalBadge();
-    renderPlayers();
-    renderHand();
-    renderTradePanels();
-    renderActions();
-    renderEndPanel();
-    renderLog();
-    renderDebugPanel();
-    renderEventModal();
+    for (const step of RENDER_STEPS) {
+      try {
+        step();
+      } catch (err) {
+        console.error(`Renderfehler in ${step.name}:`, err);
+        if (el.statusMessage) {
+          el.statusMessage.textContent = `Anzeigefehler (${step.name}): ${err.message}. Bitte Seite neu laden, falls Buttons nicht mehr reagieren.`;
+        }
+      }
+    }
   }
 
   renderNameInputs();
