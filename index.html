@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow-Markt – V0.1 Baseline</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🛒</span>
+      <h1>Flow-Markt <span class="version">V0.1</span></h1>
+    </div>
+    <button id="catalog-btn" type="button" title="Zeigt alle Kartentypen im Spiel als Übersicht.">📖 Kartenübersicht</button>
+    <label class="debug-toggle">
+      <input type="checkbox" id="debug-toggle">
+      Debug-Modus
+    </label>
+  </header>
+
+  <details class="how-to-play">
+    <summary>Wie funktioniert eine Runde?</summary>
+    <ol>
+      <li>Zu Beginn des Zugs wird automatisch 1 Karte gezogen – kein eigener Schritt nötig.</li>
+      <li>Beliebig viele passende Sets ausspielen – mindestens 2 zusammengehörige Karten, oder eine einzelne Karte, die ein bereits liegendes Set erweitert. Pro Zug gibt es höchstens 1 Bonuskarte, egal wie viele Sets folgen (außer bei Ramsch, siehe unten).</li>
+      <li>Optional die Grabbelkiste nutzen: bis zu 1 Handkarte verdeckt hineinlegen UND/ODER blind 1 Karte herausnehmen, beides unabhängig voneinander möglich. Das ist der einzige Weg, wie Karten den Besitzer wechseln – ohne Zielspieler, ohne Absprache.</li>
+      <li>Mehr als eure Handkartenlimit? Überzählige Karten wandern in die Grabbelkiste (solange Platz ist) oder auf den Sperrmüll.</li>
+      <li>Zug beenden – der nächste Spieler ist an der Reihe.</li>
+    </ol>
+    <p>Nach jeder vollständigen Runde wird eine Ereigniskarte aufgedeckt und muss per Pop-up bestätigt werden, bevor es weitergeht.</p>
+    <p><strong>Grabbelkiste:</strong> Fasst normalerweise höchstens 5 Karten. Ist sie voll, muss erst jemand herausnehmen, bevor wieder etwas hineinpasst. Niemand sieht, was drinliegt oder wer was hineingelegt hat – reines Glück, aber der einzige Weg, um an Karten anderer Spieler zu kommen. Auch Handkartenlimit-Überschuss landet zuerst hier statt direkt auf dem Sperrmüll – eine zweite Chance, schlechte Karten gegen unbekannte einzutauschen.</p>
+    <p><strong>Aufholjagd:</strong> Nach jeder vollen Runde darf, wer die wenigsten Karten ausgespielt hat, bis zur nächsten Runde zweimal statt einmal pro Zug in die Grabbelkiste greifen - sichtbar am 🎁-Badge im Spielerbereich.</p>
+    <p><strong>Twist-Ereignisse:</strong> Manche Ereignisse ändern die Regeln bis zum nächsten Ereignis - z. B. "erst Ramsch abgeben, um zu ziehen", "Sets ausspielen nur, wer schon eins gespielt hat" oder "die Grabbelkiste fasst vorübergehend viel mehr". Ein aktiver Twist wird oben im Spielbereich angezeigt.</p>
+    <p>Ist der Nachziehstapel leer, beginnt der <strong>Showdown</strong>: es wird nicht mehr gezogen und die Grabbelkiste ist geschlossen, nur noch vorhandene Sets ausgespielt. Kann niemand mehr spielen, endet die Partie.</p>
+    <p><strong>Punkte:</strong> Einzelkarte = 1 Punkt · Teilset = Kartenanzahl × Setgröße · vollständiges Set (schon ab der Hälfte der Setgröße!) = verdoppelt.</p>
+    <p><strong>Ramsch:</strong> 30% der Fundstücke sind Ramsch. Auch Ramsch lässt sich ab 2 Karten als Set ausspielen, bringt dann aber flach 1 Punkt pro Karte statt der normalen Set-Formel – und keine Bonuskarte. Eine einzelne, nie ausgespielte Ramsch-Karte ist 0 Punkte wert.</p>
+    <p><strong>Mysterio:</strong> 5 seltene Karten (goldener Glanzrand) mit echtem Spezialeffekt (Bonuspunkte am Spielende, teils mit einem kleinen Haken beim Ausspielen) – den genauen Effekt zeigt ein Tooltip auf der Karte.</p>
+  </details>
+
+  <section id="setup-screen" class="screen">
+    <p class="intro-blurb">Ein humorvolles Sammelspiel für 2–4 Feilscher an einem Bildschirm: Karten ziehen, Sets vervollständigen, seltene Mysterio-Karten ergattern – wer am Ende die meisten Punkte hat, gewinnt den Flow-Markt.</p>
+    <h2>Neue Partie starten</h2>
+    <div class="form-row">
+      <label for="player-count-input">Spieleranzahl</label>
+      <input type="number" id="player-count-input" min="2" max="4" value="3">
+    </div>
+    <div id="player-name-inputs"></div>
+    <button id="start-game-btn" class="primary" type="button">Spiel starten</button>
+  </section>
+
+  <section id="game-screen" class="screen" hidden>
+
+    <div class="status-bar">
+      <span id="phase-label" class="badge"></span>
+      <span id="round-label"></span>
+      <span id="current-player-label" class="current-player"></span>
+    </div>
+
+    <div class="hint-banner" id="hint-banner"></div>
+    <div class="modifier-banner" id="modifier-banner"></div>
+
+    <div class="board">
+
+      <div class="piles">
+        <div class="pile" id="draw-pile-el">
+          <h3>Nachziehstapel</h3>
+          <div class="pile-count" id="draw-pile-count">0</div>
+        </div>
+        <div class="pile" id="discard-pile-el">
+          <h3>Sperrmüll</h3>
+          <div class="pile-count" id="discard-pile-count">0</div>
+        </div>
+        <div class="pile" id="bin-pile-el">
+          <h3>Grabbelkiste</h3>
+          <div class="pile-count" id="bin-pile-count">0/5</div>
+        </div>
+        <div class="pile pile-event" id="event-pile-el">
+          <h3>Ereigniskarte</h3>
+          <div class="event-card" id="event-card-display">–</div>
+        </div>
+      </div>
+
+      <div class="players-area" id="players-area"></div>
+
+      <div class="hand-area">
+        <h3 id="hand-area-title">Handkarten (<span id="hand-count">0</span>/<span id="hand-limit">3</span>)</h3>
+        <div class="hand-cards" id="hand-cards"></div>
+      </div>
+
+      <div class="actions" id="actions">
+        <button id="play-set-btn" type="button" title="Spielt die ausgewählten Handkarten als (Teil-)Set aus.">🃏 Set ausspielen</button>
+        <button id="bin-put-btn" type="button" title="Legt genau 1 ausgewählte Handkarte verdeckt in die Grabbelkiste. Unabhängig davon einmal pro Zug möglich.">📥 In Grabbelkiste legen</button>
+        <button id="bin-take-btn" type="button" title="Nimmt blind 1 Karte aus der Grabbelkiste. Einmal pro Zug, bei Aufholjagd zweimal.">🎲 Blind herausnehmen</button>
+        <button id="end-turn-btn" type="button" title="Beendet deinen Zug, sofern das Handkartenlimit eingehalten ist.">✅ Zug beenden</button>
+        <button id="new-game-btn" type="button" title="Verwirft die aktuelle Partie und startet neu.">↺ Neue Partie</button>
+      </div>
+
+      <div class="discard-required" id="discard-required" hidden>
+        <p>Handkartenlimit überschritten – bitte <span id="discard-needed-count">0</span> Karte(n) auswählen und ablegen.</p>
+        <button id="confirm-discard-btn" class="primary" type="button">Ausgewählte Karten ablegen</button>
+      </div>
+
+      <div class="status-message" id="status-message"></div>
+
+      <div class="end-panel" id="end-panel" hidden>
+        <h2>Spiel beendet</h2>
+        <div id="final-scores"></div>
+      </div>
+    </div>
+
+    <div class="log-panel">
+      <h3>Verlauf</h3>
+      <ul id="log-list"></ul>
+    </div>
+
+    <div class="debug-panel" id="debug-panel" hidden>
+      <h3>Debug-Modus</h3>
+      <div id="debug-content"></div>
+    </div>
+
+  </section>
+</div>
+
+<div id="toast-container" aria-live="polite"></div>
+<div id="confetti-layer" aria-hidden="true"></div>
+
+<div class="modal-overlay" id="event-modal" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
+  <div class="modal-box">
+    <p class="modal-eyebrow">📣 Ereignis aufgedeckt</p>
+    <h2 id="event-modal-title"></h2>
+    <p id="event-modal-description"></p>
+    <button id="event-modal-ok-btn" class="primary" type="button">OK</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="catalog-modal" role="dialog" aria-modal="true" aria-labelledby="catalog-modal-title">
+  <div class="modal-box catalog-modal-box">
+    <p class="modal-eyebrow">📖 Kartenübersicht</p>
+    <h2 id="catalog-modal-title">Alle Kartentypen im Spiel</h2>
+    <div id="catalog-content"></div>
+    <button id="catalog-close-btn" class="primary" type="button">Schließen</button>
+  </div>
+</div>
+
+<script src="cards.js"></script>
+<script src="rules.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
